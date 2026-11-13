@@ -757,3 +757,17 @@ pick();if(mq.addEventListener)mq.addEventListener("change",pick);
 if("IntersectionObserver" in window)new IntersectionObserver(function(e){e[0].isIntersecting?play():v.pause()},{threshold:.05}).observe(H);
 document.addEventListener("visibilitychange",function(){document.hidden?v.pause():play()});
 })();
+
+/* ---------- portali (Booking, Airbnb, Vrbo): prima di uscire, avviso che lì costa di più ---------- */
+(function(){
+"use strict";
+document.querySelectorAll(".ota").forEach(function(o){
+ var x=o.querySelector(".ota-x"),go=o.querySelector(".ota-go"),st=o.querySelector(".ota-stay");if(!x)return;
+ x.querySelector("p").textContent=o.dataset.warn||"";st.textContent=o.dataset.stay||"";
+ o.querySelectorAll("[data-ota]").forEach(function(a){a.addEventListener("click",function(e){
+  e.preventDefault();go.href=a.href;go.textContent=(o.dataset.go||"")+" "+a.textContent;x.hidden=false;
+  try{window.dataLayer&&dataLayer.push({event:"ota_click",ota:a.dataset.ota})}catch(_){}
+  x.scrollIntoView({block:"nearest",behavior:"smooth"})})});
+ st.addEventListener("click",function(e){e.preventDefault();x.hidden=true;var f=document.getElementById("d1");if(f){f.scrollIntoView({block:"center",behavior:"smooth"});setTimeout(function(){f.focus()},500)}});
+});
+})();

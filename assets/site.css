@@ -792,3 +792,11 @@ main section.lk-in[id] .hd h2::after,#host.lk-in h2::after,#contatti.lk-in h2::a
 /* testi dell'apertura leggibili anche sul cielo chiaro */
 .hero.hv .cine-txt h1,.hero.hv .cine-txt .lead{text-shadow:0 1px 3px rgba(0,0,0,.35),0 8px 30px rgba(0,0,0,.35)}
 @media (max-width:700px){.hero.hv .cine-st::after{background:linear-gradient(rgba(10,40,48,.5),rgba(10,40,48,.3) 55%,rgba(9,36,44,.78))}}
+
+/* ===== portali con avviso sul prezzo ===== */
+.ota{margin-top:28px;padding-top:22px;border-top:1px solid var(--line2,rgba(255,255,255,.15))}
+.ota-t{font-weight:700;margin:0 0 6px}
+.ota-w{font-size:15px;color:var(--muted,rgba(244,236,218,.75));margin:0 0 14px;max-width:46ch}
+.ota-b{display:flex;flex-wrap:wrap;gap:10px}
+.ota-x{margin-top:14px;padding:14px 16px;border-radius:14px;background:rgba(240,193,120,.12);border:1px solid rgba(240,193,120,.45)}
+.ota-x p{margin:0 0 12px;font-size:15px}
