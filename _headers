@@ -17,3 +17,6 @@
   Cache-Control: public, max-age=31536000, immutable
 /assets/site.js
   Cache-Control: public, max-age=31536000, immutable
+
+/STRIPE_INTEGRATION_TODO.md
+  X-Robots-Tag: noindex
