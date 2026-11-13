@@ -739,7 +739,10 @@ all.forEach(function(x){io.observe(x)});
 var H=document.querySelector(".hero.hv"),v=H&&H.querySelector(".hv-v");if(!v)return;
 var mq=window.matchMedia("(max-aspect-ratio: 1/1)"),cur="";
 function pick(){var s=mq.matches?v.dataset.m:v.dataset.d;if(s===cur)return;cur=s;v.src=s;v.load();play()}
-function play(){var p=v.play&&v.play();if(p&&p.catch)p.catch(function(){})}
+v.muted=true;v.defaultMuted=true;v.playsInline=true;
+/* se il telefono blocca l'avvio automatico (es. risparmio energetico), parte al primo tocco o scorrimento */
+var wake=function(){play();if(!v.paused)["touchstart","scroll","click","keydown"].forEach(function(e){removeEventListener(e,wake,true)})};
+function play(){v.muted=true;var p=v.play&&v.play();if(p&&p.catch)p.catch(function(){["touchstart","scroll","click","keydown"].forEach(function(e){addEventListener(e,wake,{capture:true,passive:true})})})}
 v.addEventListener("playing",function(){H.classList.add("hv-on")});
 if(window.matchMedia("(prefers-reduced-motion: reduce)").matches){v.removeAttribute("autoplay");v.removeAttribute("loop");cur=mq.matches?v.dataset.m:v.dataset.d;v.preload="metadata";v.src=cur;return}
 pick();if(mq.addEventListener)mq.addEventListener("change",pick);
