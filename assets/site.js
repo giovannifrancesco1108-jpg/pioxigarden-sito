@@ -488,7 +488,7 @@ function shrink(f){return (window.createImageBitmap?createImageBitmap(f,{imageOr
 /* ---------- apertura cinematografica: drone → lago → terrazza → statua → occhio → prima persona → tuffo → sott'acqua ---------- */
 (function(){
 "use strict";
-var H=document.getElementById("cine");if(!H)return;
+var H=document.getElementById("cine");if(!H||H.classList.contains("hv"))return;
 /* il sito si apre sempre dall'inizio: prima immagine dall'alto e la scritta "Pio XI"; il volo parte solo quando si scorre */
 try{if("scrollRestoration" in history)history.scrollRestoration="manual"}catch(e){}
 if(!location.hash||location.hash==="#"){scrollTo(0,0);addEventListener("pageshow",function(ev){if(ev.persisted)return;scrollTo(0,0)})}
@@ -731,4 +731,19 @@ var all=[].slice.call(document.querySelectorAll(".lk,main section[id]"));
 if(!("IntersectionObserver" in window)||(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches)){all.forEach(function(x){x.classList.add("lk-on","lk-in")});return}
 var io=new IntersectionObserver(function(es){es.forEach(function(x){if(x.target.classList.contains("lk")){x.target.classList.toggle("lk-on",x.isIntersecting);if(x.isIntersecting)x.target.classList.add("lk-in")}else if(x.isIntersecting)x.target.classList.add("lk-in")})},{rootMargin:"0px 0px -12% 0px"});
 all.forEach(function(x){io.observe(x)});
+})();
+
+/* ---------- apertura: il volo sul lago come video in loop (leggero, niente blocco dello scorrimento) ---------- */
+(function(){
+"use strict";
+var H=document.querySelector(".hero.hv"),v=H&&H.querySelector(".hv-v");if(!v)return;
+var mq=window.matchMedia("(max-aspect-ratio: 1/1)"),cur="";
+function pick(){var s=mq.matches?v.dataset.m:v.dataset.d;if(s===cur)return;cur=s;v.src=s;v.load();play()}
+function play(){var p=v.play&&v.play();if(p&&p.catch)p.catch(function(){})}
+v.addEventListener("playing",function(){H.classList.add("hv-on")});
+if(window.matchMedia("(prefers-reduced-motion: reduce)").matches){v.removeAttribute("autoplay");v.removeAttribute("loop");cur=mq.matches?v.dataset.m:v.dataset.d;v.preload="metadata";v.src=cur;return}
+pick();if(mq.addEventListener)mq.addEventListener("change",pick);
+/* gira solo mentre lo vedi: fuori schermo si ferma e non consuma batteria */
+if("IntersectionObserver" in window)new IntersectionObserver(function(e){e[0].isIntersecting?play():v.pause()},{threshold:.05}).observe(H);
+document.addEventListener("visibilitychange",function(){document.hidden?v.pause():play()});
 })();
