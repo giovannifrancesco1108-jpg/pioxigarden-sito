@@ -595,6 +595,9 @@ var PR=document.createElement("div");PR.setAttribute("aria-hidden","true");PR.st
  var finish=function(){if(S===3)return;S=3;var h=Math.round(st.getBoundingClientRect().height)||innerHeight;H.style.setProperty("--hd",h+"px");
   root.classList.remove("cine-lock","cine-playing");H.classList.add("cine-end");scrollTo(0,0);measure();on()};
  document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest('a[href*="#"]');if(a&&S<3){AUTO.p=1;finish()}},true);
+ /* aperto con un link a una sezione (es. #recensioni): niente volo, si va dritti alla sezione */
+ var hs=location.hash.length>1?document.getElementById(decodeURIComponent(location.hash.slice(1))):null;
+ if(hs&&!H.contains(hs))setTimeout(function(){AUTO.p=1;finish();requestAnimationFrame(function(){hs.scrollIntoView({behavior:"instant"})})},0);
  var t0g=0;function run(t){if(S===3)return;if(!t0g)t0g=t;if(fp===0&&t-t0g<1500){var rd=0;for(var q=0;q<12;q++)if(F[q])rd++;if(rd<10){requestAnimationFrame(run);return}}var dt=lt?Math.min(80,t-lt):16;lt=t;
   if(!drag){
    /* slancio dopo aver lasciato il dito, che si spegne in un attimo */
