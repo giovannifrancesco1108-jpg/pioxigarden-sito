@@ -1,0 +1,4 @@
+/* Sul dominio non c'è l'editor di Claude: le modifiche fatte con "Modifica sito" sono fissate qui. */
+(function(){if(window.claude)return;var D={"foto": {"soggiorno": {"c": {"it": "Dal bancone: zona pranzo, librerie a muro e l'arco d'ingresso."}, "t": {"it": "Soggiorno"}}, "soggiorno-2": {"c": {"it": "Tavolo per sei, divano e la porta-finestra verso l'esterno."}, "t": {"it": "Soggiorno"}}}, "extra": {"xmw2aob3f": {"asset": "b870d4875db78f5e9e635cf65ac213c0", "at": 1793807507499, "pos": "94% 91%", "room": "camera", "z": 1.1}, "xmw2axfgh": {"asset": "a244729b74432835af7652ab87896203", "at": 1793807933058, "room": "bagno"}}, "blocchi": {}};
+function col(n){var o=D[n]||{};return{onSnapshot:function(cb){setTimeout(function(){cb({docs:Object.keys(o).map(function(k){return{id:k,data:function(){return o[k]}}})})},0);return function(){}}}}
+var db={collection:col};window.claude={use:function(n){return Promise.resolve(n==="db"?db:null)}}})();
