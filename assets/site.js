@@ -743,8 +743,15 @@ v.muted=true;v.defaultMuted=true;v.playsInline=true;
 /* se il telefono blocca l'avvio automatico (es. risparmio energetico), parte al primo tocco o scorrimento */
 var wake=function(){play();if(!v.paused)["touchstart","scroll","click","keydown"].forEach(function(e){removeEventListener(e,wake,true)})};
 function play(){v.muted=true;var p=v.play&&v.play();if(p&&p.catch)p.catch(function(){["touchstart","scroll","click","keydown"].forEach(function(e){addEventListener(e,wake,{capture:true,passive:true})})})}
-v.addEventListener("playing",function(){H.classList.add("hv-on")});
-if(window.matchMedia("(prefers-reduced-motion: reduce)").matches){v.removeAttribute("autoplay");v.removeAttribute("loop");cur=mq.matches?v.dataset.m:v.dataset.d;v.preload="metadata";v.src=cur;return}
+/* lo "spot": al primo giro il video parla da solo (Pio XI, poi il lago), poi entrano titolo e pulsanti */
+var spot=H.querySelector(".spot"),sp=0,done=false;
+function txt(){if(done)return;done=true;H.classList.remove("spot-on","s1","s2");H.classList.add("txt-on")}
+function tick(){if(done)return;var t=v.currentTime;H.classList.toggle("s1",t>.35&&t<3.1);H.classList.toggle("s2",t>5.1&&t<7.7);if(t>=7.7||v.ended){txt();return}requestAnimationFrame(tick)}
+v.addEventListener("playing",function(){H.classList.add("hv-on");if(!sp&&spot&&!done){sp=1;H.classList.add("spot-on");requestAnimationFrame(tick)}});
+/* chi scorre o tocca non aspetta: il titolo compare subito */
+["scroll","touchstart","keydown","wheel"].forEach(function(e){addEventListener(e,function(){if(scrollY>40||e!=="scroll")txt()},{passive:true,once:e!=="scroll"})});
+setTimeout(function(){if(!sp)txt()},2600);
+if(window.matchMedia("(prefers-reduced-motion: reduce)").matches){H.classList.add("txt-on");v.removeAttribute("autoplay");v.removeAttribute("loop");cur=mq.matches?v.dataset.m:v.dataset.d;v.preload="metadata";v.src=cur;return}
 pick();if(mq.addEventListener)mq.addEventListener("change",pick);
 /* gira solo mentre lo vedi: fuori schermo si ferma e non consuma batteria */
 if("IntersectionObserver" in window)new IntersectionObserver(function(e){e[0].isIntersecting?play():v.pause()},{threshold:.05}).observe(H);
