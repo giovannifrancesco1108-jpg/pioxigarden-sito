@@ -3,6 +3,8 @@
   "name": "pioxigarden-sito",
   "main": "worker/index.js",
   "compatibility_date": "2026-06-01",
+  // non cancellare le variabili impostate dalla dashboard di Cloudflare a ogni pubblicazione
+  "keep_vars": true,
   "assets": {
     "directory": "./",
     "binding": "ASSETS",
