@@ -14,7 +14,13 @@ Nel modulo "Richiedi disponibilità" l'ospite sceglie date e ospiti, scrive nome
 - **Paga ora con carta** → `POST /api/prenota`: il server calcola notti × prezzo (+ pulizie) e crea la sessione Stripe. Compare solo se `STRIPE_SECRET_KEY` è impostata.
 - **Invia su WhatsApp** → apre WhatsApp con il messaggio già compilato.
 
-Prezzi modificabili senza codice (Worker → Impostazioni → Variabili e segreti, tipo Testo): `PREZZO_NOTTE` (predefinito 75), `PULIZIE` (predefinito 0), `NOTTI_MIN` (predefinito 1). Massimo 30 notti e 4 ospiti.
+Prezzi: si impostano dal pannello riservato **/admin** (prezzo a notte, venerdì/sabato, pulizie, notti minime, periodi speciali), salvati in Cloudflare KV (binding `PX`). Le variabili `PREZZO_NOTTE`, `PULIZIE`, `NOTTI_MIN` restano solo come ripiego. Massimo 30 notti e 4 ospiti.
+
+## Pannello /admin
+- Primo accesso: si crea la password (min 8 caratteri), salvata come hash PBKDF2 in KV (`auth`). Sessione con cookie HttpOnly per 30 giorni; 10 tentativi sbagliati → blocco di 15 minuti.
+- Password dimenticata: Cloudflare → Storage e database → KV → spazio del Worker → cancellare la chiave `auth`, poi riaprire /admin e crearne una nuova.
+- Da collegato, sul sito compare "Modifica sito": foto, ritagli, didascalie, foto nelle stanze e blocchi liberi si salvano in KV (`col:foto`, `col:extra`, `col:blocchi`, immagini in `blob:<id>` servite su `/_blob/<id>`).
+- Impostazioni: pagamento con carta acceso/spento, link Booking/Airbnb/Vrbo.
 Le date pagate vanno chiuse a mano su Booking/Airbnb: il sito non legge ancora i loro calendari.
 
 ## Setup

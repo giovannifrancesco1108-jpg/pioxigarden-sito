@@ -185,14 +185,16 @@ form.addEventListener("change",sum);
 /* riepilogo e pagamento con carta (Stripe) */
 var bk=$("#bk"),bkt=$("#bkt"),sbc=$("#sbc"),bkor=$("#bkor"),bkn=$("#bkn"),CFG=null,via="wa";
 var eur=function(v){return new Intl.NumberFormat(PX.lang,{style:"currency",currency:"EUR",maximumFractionDigits:v%1?2:0}).format(v)};
-function sum(){if(!CFG||!bkt)return;var n=nights(),g=+(document.getElementById("gg")||{}).value||2;
+function np(iso){var x=(CFG.stagioni||[]).filter(function(z){return iso>=z.dal&&iso<=z.al})[0];if(x)return x.notte;var w=new Date(iso+"T12:00:00Z").getUTCDay();return (w===5||w===6)&&CFG.weekend!=null?CFG.weekend:CFG.notte}
+function sum(){if(!CFG||!bkt)return;var n=nights();
  if(n<1){bkt.hidden=true;return}
- var tot=n*CFG.notte+CFG.pulizie;
- bkt.innerHTML='<p class="bk-h">'+U.bkT+'</p><div class="bk-r"><span>'+n+' '+(n===1?U.n1:U.nN)+' × '+eur(CFG.notte)+'</span><span>'+eur(n*CFG.notte)+'</span></div>'+
+ var st=0,ps={},t0=new Date(d1.value+"T12:00:00Z");for(var k=0;k<n;k++){var v=np(new Date(t0.getTime()+k*864e5).toISOString().slice(0,10));st+=v;ps[v]=(ps[v]||0)+1}
+ var tot=st+CFG.pulizie,rows=Object.keys(ps).sort(function(a,b){return a-b}).map(function(v){var c=ps[v];return '<div class="bk-r"><span>'+c+' '+(c===1?U.n1:U.nN)+' × '+eur(+v)+'</span><span>'+eur(c*v)+'</span></div>'}).join("");
+ bkt.innerHTML='<p class="bk-h">'+U.bkT+'</p>'+rows+
   (CFG.pulizie?'<div class="bk-r"><span>'+U.cln+'</span><span>'+eur(CFG.pulizie)+'</span></div>':'')+
   '<svg class="bk-wv" viewBox="0 0 120 8" preserveAspectRatio="none" aria-hidden="true"><path d="M0 4q7.5-4 15 0t15 0 15 0 15 0 15 0 15 0 15 0 15 0"/></svg>'+
   '<div class="bk-r bk-tot"><span>'+U.tot+'</span><b>'+eur(tot)+'</b></div>';
- bkt.hidden=false}
+ bkt.dataset.tot=tot;bkt.hidden=false}
 fetch("/api/pay-status",{cache:"no-store"}).then(function(r){return r.ok?r.json():null}).then(function(d){if(!d||!d.card)return;CFG=d;
  sbc.hidden=false;bkor.hidden=false;bk.classList.add("on");bkn.textContent=U.note;sum()}).catch(function(){});
 [sbc,btn].forEach(function(b){if(b)b.addEventListener("click",function(){via=b.dataset.via})});
@@ -204,8 +206,9 @@ form.addEventListener("submit",function(e){e.preventDefault();var f=data();msg.c
  if(!$(".chk input",form).checked){msg.className="msg bad";msg.textContent=U.errConsent;return}
  if(via==="card"&&CFG){
   if(!(nights()>0)){msg.className="msg bad";msg.textContent=U.errNoDates;return}
+  if(nights()<(CFG.min||1)){msg.className="msg bad";msg.textContent=(U.errMin||"Min: ")+CFG.min+" "+U.nN+".";return}
   sbc.disabled=true;var lb=sbc.querySelector("span"),old=lb.textContent;lb.textContent=U.paying;bk.classList.add("go");
-  track("begin_checkout",{value:nights()*CFG.notte+CFG.pulizie,currency:"EUR"});
+  track("begin_checkout",{value:+bkt.dataset.tot||0,currency:"EUR"});
   fetch("/api/prenota",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(f)})
    .then(function(r){return r.json().then(function(j){if(!r.ok||!j.url)throw new Error(j.error||r.status);return j})})
    .then(function(j){location.href=j.url})

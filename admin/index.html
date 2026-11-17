@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#17464d">
+<title>Area riservata · Pio XI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700&display=swap">
+<style>
+:root{--bg:#17464d;--bg2:#2c2a45;--panel:rgba(255,255,255,.06);--line:rgba(244,236,218,.16);--fg:#f4ecda;--mute:rgba(244,236,218,.7);--gold:#f0c178;--good:#9fd3a4;--bad:#f2a49a;--fd:"Cormorant Garamond",Georgia,serif;--fb:"Nunito Sans",system-ui,-apple-system,sans-serif;color-scheme:dark}
+*{box-sizing:border-box}
+html{background:#1f3a48}
+body{margin:0;min-height:100vh;background:linear-gradient(170deg,#17464d 0%,#203a4a 45%,#2c2a45 100%);color:var(--fg);font:16px/1.55 var(--fb)}
+body{padding:max(20px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 60px max(16px,env(safe-area-inset-left))}
+main{max-width:640px;margin:0 auto;display:grid;gap:18px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0 4px}
+h1{font:600 clamp(30px,8vw,40px)/1.05 var(--fd);margin:0}
+h1 small{display:block;font:600 14px var(--fb);color:var(--gold);letter-spacing:.02em;margin-top:4px}
+h2{font:600 26px/1.15 var(--fd);margin:0 0 4px;text-wrap:balance}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:20px;display:grid;gap:14px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.card>p{margin:0;color:var(--mute)}
+label{display:grid;gap:6px;font-weight:600;font-size:14px;color:var(--mute)}
+input[type=text],input[type=password],input[type=number],input[type=url],input[type=date]{font:inherit;font-size:16px;color:var(--fg);background:rgba(10,20,25,.35);border:1px solid var(--line);border-radius:12px;padding:12px 14px;width:100%;min-width:0}
+input:focus,button:focus-visible,a:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.eur{position:relative}.eur input{padding-right:34px}.eur::after{content:"€";position:absolute;right:14px;bottom:12px;color:var(--mute);font-weight:400}
+.btn{font:700 16px var(--fb);border:0;border-radius:999px;padding:13px 22px;background:var(--gold);color:#1d2b2c;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px}
+.btn.g{background:transparent;color:var(--fg);border:1px solid var(--line)}
+.btn.s{padding:9px 16px;min-height:40px;font-size:15px}
+.btn:disabled{opacity:.6}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.msg{margin:0;font-weight:600;min-height:1.4em}.msg.ok{color:var(--good)}.msg.ko{color:var(--bad)}
+.hint{font-size:14px;color:var(--mute);margin:0}
+.per{display:grid;grid-template-columns:1fr 1fr 110px 44px;gap:8px;align-items:end;padding:12px;border:1px dashed var(--line);border-radius:14px}
+.per .nm{grid-column:1/-1}
+.per button{height:46px;border-radius:12px;border:1px solid var(--line);background:transparent;color:var(--bad);font-size:20px;cursor:pointer}
+.sw{display:flex;align-items:center;justify-content:space-between;gap:14px;font-size:16px;color:var(--fg);font-weight:600}
+.sw input{appearance:none;width:52px;height:30px;border-radius:99px;background:rgba(255,255,255,.18);position:relative;flex:none;cursor:pointer;transition:background .2s}
+.sw input::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:var(--fg);transition:transform .2s}
+.sw input:checked{background:var(--gold)}.sw input:checked::after{transform:translateX(22px);background:#1d2b2c}
+.pill{display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:600;padding:6px 12px;border-radius:99px;background:rgba(255,255,255,.08)}
+.pill i{width:9px;height:9px;border-radius:50%;background:var(--bad)}.pill.on i{background:var(--good)}
+.lake{display:block;width:100%;height:14px;margin:2px 0 -4px;fill:none;stroke:var(--gold);stroke-width:1.3;opacity:.5}
+.ex{font-size:15px;color:var(--fg);background:rgba(240,193,120,.08);border-radius:12px;padding:10px 14px;margin:0;font-variant-numeric:tabular-nums}
+[hidden]{display:none!important}
+@media (max-width:480px){.grid2{grid-template-columns:1fr}.per{grid-template-columns:1fr 1fr}.per .eur{grid-column:1}.per button{grid-column:2}}
+</style>
+</head>
+<body>
+<main>
+<header><h1>Pio XI<small>Area riservata</small></h1><button class="btn g s" id="out" hidden>Esci</button></header>
+<svg class="lake" viewBox="0 0 300 14" preserveAspectRatio="none" aria-hidden="true"><path d="M0 7q12.5-7 25 0t25 0 25 0 25 0 25 0 25 0 25 0 25 0 25 0 25 0 25 0 25 0"/></svg>
+
+<section class="card" id="auth" hidden>
+ <h2 id="authT">Accedi</h2>
+ <p id="authP">Scrivi la tua password per gestire il sito.</p>
+ <form id="authF" class="row" style="display:grid;gap:12px">
+  <label>Password<input type="password" id="pw" autocomplete="current-password" required minlength="8"></label>
+  <label id="pw2L" hidden>Ripeti la password<input type="password" id="pw2" autocomplete="new-password" minlength="8"></label>
+  <button class="btn" type="submit" id="authB">Entra</button>
+  <p class="msg" id="authM" role="status"></p>
+ </form>
+</section>
+
+<div id="app" hidden style="display:grid;gap:18px">
+<section class="card">
+ <h2>Prezzi</h2>
+ <p>Sono i prezzi che il sito usa per calcolare il totale e far pagare con carta.</p>
+ <div class="grid2">
+  <label>A notte<span class="eur"><input type="number" id="pN" inputmode="decimal" min="1" step="1"></span></label>
+  <label>Venerdì e sabato notte<span class="eur"><input type="number" id="pW" inputmode="decimal" min="0" step="1" placeholder="uguale"></span></label>
+  <label>Pulizie (una volta)<span class="eur"><input type="number" id="pC" inputmode="decimal" min="0" step="1"></span></label>
+  <label>Notti minime<input type="number" id="pM" inputmode="numeric" min="1" max="30" step="1"></label>
+ </div>
+ <div style="display:grid;gap:10px">
+  <h2 style="font-size:21px">Periodi speciali</h2>
+  <p class="hint">Per Natale, agosto, ponti: in queste date vale il prezzo scritto qui, al posto degli altri.</p>
+  <div id="per" style="display:grid;gap:10px"></div>
+  <div><button class="btn g s" type="button" id="addP">+ Aggiungi periodo</button></div>
+ </div>
+ <p class="ex" id="ex"></p>
+ <div class="row"><button class="btn" type="button" id="saveP">Salva prezzi</button><p class="msg" id="mP" role="status"></p></div>
+</section>
+
+<section class="card">
+ <h2>Foto e testi del sito</h2>
+ <p>Apri il sito: in basso compare il pulsante <b>Modifica sito</b>. Puoi cambiare o ritagliare le foto, riscrivere le didascalie, aggiungere foto nelle stanze e nuovi blocchi di testo, immagini o pulsanti.</p>
+ <div class="row">
+  <a class="btn" href="/it/">Apri e modifica (italiano)</a>
+  <a class="btn g s" href="/en/">EN</a><a class="btn g s" href="/fr/">FR</a><a class="btn g s" href="/de/">DE</a><a class="btn g s" href="/es/">ES</a>
+ </div>
+ <p class="hint">Le didascalie si scrivono lingua per lingua: apri la versione in quella lingua e modificale lì.</p>
+</section>
+
+<section class="card">
+ <h2>Pagamenti</h2>
+ <div class="row"><span class="pill" id="stp"><i></i><span></span></span></div>
+ <label class="sw">Pagamento con carta sul sito<input type="checkbox" id="iC"></label>
+ <p class="hint">Se lo spegni, resta solo "Invia su WhatsApp".</p>
+ <h2 style="font-size:21px;margin-top:6px">Link ai portali</h2>
+ <p class="hint">Incolla l'indirizzo dei tuoi annunci: compariranno nel sito con l'avviso che lì il prezzo è più alto.</p>
+ <label>Booking.com<input type="url" id="iB" inputmode="url" placeholder="https://www.booking.com/hotel/it/…"></label>
+ <label>Airbnb<input type="url" id="iA" inputmode="url" placeholder="https://www.airbnb.it/rooms/…"></label>
+ <label>Vrbo<input type="url" id="iV" inputmode="url" placeholder="https://www.vrbo.com/…"></label>
+ <div class="row"><button class="btn" type="button" id="saveI">Salva</button><p class="msg" id="mI" role="status"></p></div>
+</section>
+
+<section class="card">
+ <h2>Cambia password</h2>
+ <div class="grid2">
+  <label>Password attuale<input type="password" id="o1" autocomplete="current-password"></label>
+  <label>Nuova password<input type="password" id="o2" autocomplete="new-password" minlength="8"></label>
+ </div>
+ <div class="row"><button class="btn g" type="button" id="savePw">Cambia password</button><p class="msg" id="mW" role="status"></p></div>
+</section>
+</div>
+</main>
+<script>
+(function(){
+"use strict";
+var $=function(i){return document.getElementById(i)};
+function api(m,p,b){return fetch("/api/admin/"+p,{method:m,credentials:"same-origin",headers:{"Content-Type":"application/json","X-PX":"1"},body:b?JSON.stringify(b):undefined}).then(function(r){return r.json().catch(function(){return{}}).then(function(j){if(!r.ok){var e=new Error(j.error||r.status);e.code=j.error;throw e}return j})})}
+function say(el,t,ok){el.textContent=t;el.className="msg "+(ok?"ok":"ko");if(ok)setTimeout(function(){if(el.textContent===t)el.textContent=""},3500)}
+var setup=false;
+function boot(){api("GET","me").then(function(j){if(j.admin)return app(j);setup=j.setup;$("auth").hidden=false;
+  if(setup){$("authT").textContent="Crea la tua password";$("authP").textContent="È il primo accesso: scegli una password di almeno 8 caratteri. Servirà solo a te per entrare qui.";$("pw2L").hidden=false;$("pw").autocomplete="new-password";$("authB").textContent="Crea e entra"}
+  $("pw").focus()}).catch(function(e){$("auth").hidden=false;say($("authM"),e.code==="kv_missing"?"L'archivio non è ancora attivo: riprova tra qualche minuto.":"Server non raggiungibile. Riprova.")})}
+$("authF").addEventListener("submit",function(e){e.preventDefault();var p=$("pw").value;
+ if(p.length<8)return say($("authM"),"Almeno 8 caratteri.");
+ if(setup&&p!==$("pw2").value)return say($("authM"),"Le due password non coincidono.");
+ $("authB").disabled=true;api("POST",setup?"setup":"login",{password:p}).then(function(){location.reload()})
+  .catch(function(e){$("authB").disabled=false;say($("authM"),e.code==="wait"?"Troppi tentativi: riprova tra 15 minuti.":e.code==="exists"?"La password esiste già: ricarica la pagina.":"Password sbagliata.")})});
+$("out").onclick=function(){api("POST","logout").then(function(){location.reload()})};
+
+/* prezzi */
+var P=null;
+function perRow(x){x=x||{};var d=document.createElement("div");d.className="per";
+ d.innerHTML='<label class="nm">Nome (facoltativo)<input type="text" class="n" maxlength="40" placeholder="Es. Natale"></label><label>Dal<input type="date" class="a"></label><label>Al (compreso)<input type="date" class="b"></label><label>A notte<span class="eur"><input type="number" class="v" inputmode="decimal" min="1" step="1"></span></label><button type="button" aria-label="Elimina periodo">×</button>';
+ d.querySelector(".n").value=x.nome||"";d.querySelector(".a").value=x.dal||"";d.querySelector(".b").value=x.al||"";d.querySelector(".v").value=x.notte!=null?x.notte:"";
+ d.querySelector("button").onclick=function(){d.remove();ex()};d.addEventListener("input",ex);$("per").appendChild(d)}
+function read(){return{notte:$("pN").value,weekend:$("pW").value,pulizie:$("pC").value||0,min:$("pM").value||1,
+ stagioni:[].slice.call(document.querySelectorAll(".per")).map(function(d){return{nome:d.querySelector(".n").value.trim(),dal:d.querySelector(".a").value,al:d.querySelector(".b").value,notte:d.querySelector(".v").value}}).filter(function(x){return x.dal&&x.al&&x.notte!==""})}}
+function eur(v){return new Intl.NumberFormat("it",{style:"currency",currency:"EUR",maximumFractionDigits:v%1?2:0}).format(v)}
+function ex(){var r=read(),n=+r.notte||0,w=r.weekend===""?n:+r.weekend,c=+r.pulizie||0;
+ $("ex").textContent="Esempio: un weekend da venerdì a domenica (2 notti) costa "+eur(2*w+c)+(c?" con le pulizie":"")+"; da lunedì a mercoledì "+eur(2*n+c)+"."}
+["pN","pW","pC","pM"].forEach(function(i){$(i).addEventListener("input",ex)});
+$("addP").onclick=function(){perRow({});ex()};
+$("saveP").onclick=function(){var r=read();if(!(+r.notte>0))return say($("mP"),"Scrivi il prezzo a notte.");
+ var bad=r.stagioni.some(function(x){return x.al<x.dal});if(bad)return say($("mP"),"In un periodo la data finale è prima di quella iniziale.");
+ $("saveP").disabled=true;api("PUT","prezzi",r).then(function(j){fill(j);say($("mP"),"Salvato. Il sito usa già i nuovi prezzi.",true)}).catch(function(){say($("mP"),"Non salvato. Riprova.")}).then(function(){$("saveP").disabled=false})};
+function fill(j){P=j;$("pN").value=j.notte;$("pW").value=j.weekend==null?"":j.weekend;$("pC").value=j.pulizie||0;$("pM").value=j.min||1;$("per").innerHTML="";(j.stagioni||[]).forEach(perRow);ex()}
+
+/* impostazioni */
+function fillI(j){$("iC").checked=j.carta!==false;$("iB").value=j.booking||"";$("iA").value=j.airbnb||"";$("iV").value=j.vrbo||""}
+$("saveI").onclick=function(){var b={carta:$("iC").checked,booking:$("iB").value.trim(),airbnb:$("iA").value.trim(),vrbo:$("iV").value.trim()};
+ var bad=["booking","airbnb","vrbo"].filter(function(k){return b[k]&&!/^https:\/\/\S+$/.test(b[k])});if(bad.length)return say($("mI"),"I link devono iniziare con https://");
+ $("saveI").disabled=true;api("PUT","impostazioni",b).then(function(j){fillI(j);say($("mI"),"Salvato.",true)}).catch(function(){say($("mI"),"Non salvato. Riprova.")}).then(function(){$("saveI").disabled=false})};
+$("iC").onchange=function(){$("saveI").click()};
+
+$("savePw").onclick=function(){var a=$("o1").value,b=$("o2").value;if(b.length<8)return say($("mW"),"La nuova password deve avere almeno 8 caratteri.");
+ api("POST","password",{old:a,password:b}).then(function(){$("o1").value=$("o2").value="";say($("mW"),"Password cambiata.",true)}).catch(function(e){say($("mW"),e.code==="bad"?"La password attuale è sbagliata.":"Non cambiata. Riprova.")})};
+
+function app(me){$("app").hidden=false;$("out").hidden=false;
+ var s=$("stp");s.classList.toggle("on",!!me.stripe);s.querySelector("span").textContent=me.stripe?"Stripe collegato":"Stripe non collegato: manca la chiave";
+ api("GET","prezzi").then(fill).catch(function(){});api("GET","impostazioni").then(fillI).catch(function(){})}
+boot();
+})();
+</script>
+</body>
+</html>

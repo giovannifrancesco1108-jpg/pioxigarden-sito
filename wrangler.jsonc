@@ -5,6 +5,8 @@
   "compatibility_date": "2026-06-01",
   // non cancellare le variabili impostate dalla dashboard di Cloudflare a ogni pubblicazione
   "keep_vars": true,
+  // archivio del pannello /admin (foto, testi, prezzi): Cloudflare lo crea da solo alla prima pubblicazione
+  "kv_namespaces": [{ "binding": "PX" }],
   "assets": {
     "directory": "./",
     "binding": "ASSETS",

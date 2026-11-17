@@ -1,7 +1,7 @@
 // POST /api/prenota  (JSON: lang, arrival, departure, guests, name, phone)
 // Calcola il totale sul server (notti × prezzo + pulizie) e crea la sessione Stripe Checkout.
 // Risponde { url } e il sito manda l'ospite alla pagina di pagamento di Stripe.
-import { prezzi } from "../../lib/prezzi.js";
+import { getPrezzi, getImp, nightPrice } from "../../lib/store.js";
 
 const LANGS = ["it", "en", "fr", "de", "es"];
 const TXT = {
@@ -17,10 +17,11 @@ const clean = (s, n) => String(s || "").replace(/[\u0000-\u001f]/g, " ").replace
 
 export async function onRequestPost({ request, env }) {
   if (!env.STRIPE_SECRET_KEY) return json({ error: "card_off" }, 503);
+  if (!(await getImp(env)).carta) return json({ error: "card_off" }, 503);
   let b;
   try { b = await request.json(); } catch { return json({ error: "bad_request" }, 400); }
 
-  const P = prezzi(env);
+  const P = await getPrezzi(env);
   const lang = LANGS.includes(b.lang) ? b.lang : "it";
   const t = TXT[lang];
   const a = day(b.arrival), d = day(b.departure);
@@ -31,6 +32,9 @@ export async function onRequestPost({ request, env }) {
   const phone = clean(b.phone, 30);
   if (!Number.isFinite(nights) || a < today || nights < P.min || nights > P.max) return json({ error: "dates" }, 400);
   if (!(guests >= 1 && guests <= P.ospiti) || !name || phone.replace(/\D/g, "").length < 6) return json({ error: "fields" }, 400);
+
+  let stayCents = 0;
+  for (let k = 0; k < nights; k++) stayCents += Math.round(nightPrice(P, new Date(a + k * 864e5).toISOString().slice(0, 10)) * 100);
 
   const fmt = new Intl.DateTimeFormat(lang, { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
   const range = `${fmt.format(a)} – ${fmt.format(d)}`;
@@ -49,9 +53,9 @@ export async function onRequestPost({ request, env }) {
     origin_context: "web",
     mode: "payment",
     locale: lang,
-    "line_items[0][quantity]": String(nights),
+    "line_items[0][quantity]": "1",
     "line_items[0][price_data][currency]": "eur",
-    "line_items[0][price_data][unit_amount]": String(Math.round(P.notte * 100)),
+    "line_items[0][price_data][unit_amount]": String(stayCents),
     "line_items[0][price_data][product_data][name]": `${t.stay} Pio XI Garden & Lake View Apartment`,
     "line_items[0][price_data][product_data][description]": `${t.n(nights)} · ${range} · ${guests} ${t.g}`,
     "metadata[nome]": name,
