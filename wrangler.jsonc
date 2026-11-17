@@ -9,6 +9,8 @@
     "directory": "./",
     "binding": "ASSETS",
     "html_handling": "auto-trailing-slash",
-    "not_found_handling": "404-page"
+    "not_found_handling": "404-page",
+    // il Worker passa per primo: API Stripe e redirect dei domini secondari
+    "run_worker_first": true
   }
 }
