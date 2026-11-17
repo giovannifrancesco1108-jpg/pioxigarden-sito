@@ -194,7 +194,9 @@ function sum(){if(!CFG||!bkt)return;var n=nights();
   (CFG.pulizie?'<div class="bk-r"><span>'+U.cln+'</span><span>'+eur(CFG.pulizie)+'</span></div>':'')+
   '<svg class="bk-wv" viewBox="0 0 120 8" preserveAspectRatio="none" aria-hidden="true"><path d="M0 4q7.5-4 15 0t15 0 15 0 15 0 15 0 15 0 15 0 15 0"/></svg>'+
   '<div class="bk-r bk-tot"><span>'+U.tot+'</span><b>'+eur(tot)+'</b></div>';
- bkt.dataset.tot=tot;bkt.hidden=false}
+ var prev=+bkt.dataset.tot||0;bkt.dataset.tot=tot;bkt.hidden=false;
+ var tb=bkt.querySelector(".bk-tot b");if(tb&&prev&&prev!==tot&&!(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches)){var t0=performance.now();
+  (function step(t){var k=Math.min(1,(t-t0)/600),e=1-Math.pow(1-k,3);tb.textContent=eur(Math.round(prev+(tot-prev)*e));if(k<1)requestAnimationFrame(step);else{tb.textContent=eur(tot);tb.classList.add("tick");setTimeout(function(){tb.classList.remove("tick")},520)}})(t0)}}
 fetch("/api/pay-status",{cache:"no-store"}).then(function(r){return r.ok?r.json():null}).then(function(d){if(!d||!d.card)return;CFG=d;
  sbc.hidden=false;bkor.hidden=false;bk.classList.add("on");bkn.textContent=U.note;sum()}).catch(function(){});
 [sbc,btn].forEach(function(b){if(b)b.addEventListener("click",function(){via=b.dataset.via})});
@@ -317,21 +319,27 @@ if(lb){document.getElementById("lbx").onclick=function(){lb.close()};document.ge
  var ex=document.getElementById("exg");if(ex){ex.addEventListener("click",function(e){var b=e.target.closest(".ex-b");if(!b||!lb.showModal||document.documentElement.classList.contains("edmode"))return;set=[].slice.call(ex.querySelectorAll("figure"));show(+b.dataset.i);lb.showModal();document.getElementById("lbx").focus({preventScroll:true})})}}
 })();
 
-/* ---------- consenso ai cookie: Tag Manager si carica solo dopo "Accetto" ---------- */
+/* ---------- consenso ai cookie: Tag Manager e Microsoft Clarity (mappe di calore) solo dopo "Accetto" ----------
+   gli ID si impostano da /admin → Statistiche; arrivano con /api/data e qui partono con PXtrackers() */
 (function(){
 "use strict";
-var PX=window.PX||{},E=PX.ed||{};
+var PX=window.PX||{},E=PX.ed||{},shown=false;
 document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("[data-ota]");if(a){try{window.dataLayer=window.dataLayer||[];window.dataLayer.push({event:"ota_click",platform:a.dataset.ota})}catch(x){}}},true);
-if(!PX.gtm)return;
-function load(){if(window.__gtm)return;window.__gtm=1;window.dataLayer=window.dataLayer||[];window.dataLayer.push({"gtm.start":Date.now(),event:"gtm.js"});
- var s=document.createElement("script");s.async=true;s.src="https://www.googletagmanager.com/gtm.js?id="+encodeURIComponent(PX.gtm);document.head.appendChild(s)}
-var v=null;try{v=localStorage.getItem("pxc")}catch(x){}
-if(v==="1"){load();return}if(v==="0")return;
-var b=document.createElement("div");b.className="ck";b.setAttribute("role","dialog");b.setAttribute("aria-label",E.more||"Privacy");
-b.innerHTML='<p></p><div><button type="button" class="btn g s" data-c="0"></button><button type="button" class="btn s" data-c="1"></button></div>';
-b.querySelector("p").textContent=E.cookie||"";b.querySelector('[data-c="0"]').textContent=E.no||"No";b.querySelector('[data-c="1"]').textContent=E.ok||"OK";
-b.addEventListener("click",function(e){var c=e.target.closest("[data-c]");if(!c)return;try{localStorage.setItem("pxc",c.dataset.c)}catch(x){}if(c.dataset.c==="1")load();b.remove()});
-document.body.appendChild(b);
+function load(){
+ if(PX.gtm&&!window.__gtm){window.__gtm=1;window.dataLayer=window.dataLayer||[];window.dataLayer.push({"gtm.start":Date.now(),event:"gtm.js"});
+  var s=document.createElement("script");s.async=true;s.src="https://www.googletagmanager.com/gtm.js?id="+encodeURIComponent(PX.gtm);document.head.appendChild(s)}
+ if(PX.clarity&&!window.__clr){window.__clr=1;(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+encodeURIComponent(i);y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y)})(window,document,"clarity","script",PX.clarity);
+  try{window.clarity("consent")}catch(x){}}}
+function start(){if(!PX.gtm&&!PX.clarity)return;if(document.documentElement.classList.contains("px-admin"))return;
+ var v=null;try{v=localStorage.getItem("pxc")}catch(x){}
+ if(v==="1"){load();return}if(v==="0"||shown)return;shown=true;
+ var b=document.createElement("div");b.className="ck";b.setAttribute("role","dialog");b.setAttribute("aria-label",E.more||"Privacy");
+ b.innerHTML='<p></p><div><button type="button" class="btn g s" data-c="0"></button><button type="button" class="btn s" data-c="1"></button></div>';
+ b.querySelector("p").textContent=E.cookie||"";b.querySelector('[data-c="0"]').textContent=E.no||"No";b.querySelector('[data-c="1"]').textContent=E.ok||"OK";
+ b.addEventListener("click",function(e){var c=e.target.closest("[data-c]");if(!c)return;try{localStorage.setItem("pxc",c.dataset.c)}catch(x){}if(c.dataset.c==="1")load();b.remove()});
+ document.body.appendChild(b)}
+window.PXtrackers=function(o){o=o||{};if(o.gtm&&/^GTM-[A-Z0-9]{4,12}$/.test(o.gtm))PX.gtm=o.gtm;if(o.clarity&&/^[a-z0-9]{6,20}$/.test(o.clarity))PX.clarity=o.clarity;start()};
+start();
 })();
 
 /* ---------- gestione delle foto: solo per il proprietario (chi può modificare l'anteprima) ----------
@@ -811,3 +819,12 @@ C.querySelector(".pc-f").addEventListener("submit",function(){var b=this.querySe
 (function(){var M=document.querySelector(".dove-m");if(!M)return;var b=M.querySelector(".dove-show");if(!b)return;
 b.addEventListener("click",function(){if(M.classList.contains("on"))return;var f=document.createElement("iframe");f.src=M.dataset.src;f.title=M.dataset.title||"";f.loading="lazy";f.referrerPolicy="no-referrer-when-downgrade";f.allowFullscreen=true;M.appendChild(f);M.classList.add("on");
  try{(window.dataLayer=window.dataLayer||[]).push({event:"map_open"})}catch(e){}})})();
+
+/* foto che emergono dal lago, una alla volta mentre scorrete */
+(function(){if(!("IntersectionObserver" in window)||(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches))return;
+var F=[].slice.call(document.querySelectorAll(".ex"));if(!F.length)return;
+F.forEach(function(f){var r=f.getBoundingClientRect();if(r.top>innerHeight)f.classList.add("sv")});
+var io=new IntersectionObserver(function(es){var d=0;es.forEach(function(e){if(e.isIntersecting){var f=e.target;setTimeout(function(){f.classList.add("up")},d);d+=140;io.unobserve(f)}})},{rootMargin:"0px 0px -12% 0px",threshold:.15});
+F.forEach(function(f){if(f.classList.contains("sv"))io.observe(f)})})();
+/* barchetta sulla mappa: ferma se preferite meno movimento */
+(function(){var s=document.querySelector(".dove-art");if(s&&s.pauseAnimations&&window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches)s.pauseAnimations()})();

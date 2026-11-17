@@ -27,7 +27,7 @@ async function startSession(env) {
 
 export async function publicData(env) {
   const [foto, extra, blocchi, imp] = await Promise.all([getCol(env, "foto"), getCol(env, "extra"), getCol(env, "blocchi"), getImp(env)]);
-  return J({ foto, extra, blocchi, link: { airbnb: imp.airbnb, vrbo: imp.vrbo, booking: imp.booking } }, 200, { "Cache-Control": "public, max-age=20" });
+  return J({ foto, extra, blocchi, link: { airbnb: imp.airbnb, vrbo: imp.vrbo, booking: imp.booking }, stat: { gtm: imp.gtm, clarity: imp.clarity } }, 200, { "Cache-Control": "public, max-age=20" });
 }
 
 export async function blob(env, id) {

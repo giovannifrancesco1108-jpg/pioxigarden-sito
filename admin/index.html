@@ -113,6 +113,16 @@ input:focus,button:focus-visible,a:focus-visible{outline:2px solid var(--gold);o
 </section>
 
 <section class="card">
+ <h2>Statistiche e mappe di calore</h2>
+ <p>Vedi dove toccano e fin dove scorrono gli ospiti, e misura le prenotazioni delle campagne. Partono solo per chi accetta i cookie.</p>
+ <label>Microsoft Clarity: ID del progetto<input type="text" id="sCl" autocapitalize="off" spellcheck="false" placeholder="es. k3x9abcd12"></label>
+ <p class="hint">clarity.microsoft.com → Nuovo progetto (sito: pioxigarden.com) → Impostazioni → Panoramica → "ID progetto". Gratis, con mappe di calore e registrazioni anonime delle visite.</p>
+ <label>Google Tag Manager: ID contenitore<input type="text" id="sGt" autocapitalize="characters" spellcheck="false" placeholder="GTM-XXXXXXX"></label>
+ <p class="hint">Serve per Google Analytics e per misurare le campagne Google Ads e Meta.</p>
+ <div class="row"><button class="btn" type="button" id="saveS">Salva</button><p class="msg" id="mS" role="status"></p></div>
+</section>
+
+<section class="card">
  <h2>Cambia password</h2>
  <div class="grid2">
   <label>Password attuale<input type="password" id="o1" autocomplete="current-password"></label>
@@ -158,8 +168,9 @@ $("saveP").onclick=function(){var r=read();if(!(+r.notte>0))return say($("mP"),"
 function fill(j){P=j;$("pN").value=j.notte;$("pW").value=j.weekend==null?"":j.weekend;$("pC").value=j.pulizie||0;$("pM").value=j.min||1;$("per").innerHTML="";(j.stagioni||[]).forEach(perRow);ex()}
 
 /* impostazioni */
-function fillI(j){$("iC").checked=j.carta!==false;$("iB").value=j.booking||"";$("iA").value=j.airbnb||"";$("iV").value=j.vrbo||""}
-$("saveI").onclick=function(){var b={carta:$("iC").checked,booking:$("iB").value.trim(),airbnb:$("iA").value.trim(),vrbo:$("iV").value.trim()};
+function fillI(j){I=j;$("sCl").value=j.clarity||"";$("sGt").value=j.gtm||"";$("iC").checked=j.carta!==false;$("iB").value=j.booking||"";$("iA").value=j.airbnb||"";$("iV").value=j.vrbo||""}
+var I={};
+$("saveI").onclick=function(){var b={carta:$("iC").checked,booking:$("iB").value.trim(),airbnb:$("iA").value.trim(),vrbo:$("iV").value.trim(),gtm:I.gtm||"",clarity:I.clarity||""};
  var bad=["booking","airbnb","vrbo"].filter(function(k){return b[k]&&!/^https:\/\/\S+$/.test(b[k])});if(bad.length)return say($("mI"),"I link devono iniziare con https://");
  $("saveI").disabled=true;api("PUT","impostazioni",b).then(function(j){fillI(j);say($("mI"),"Salvato.",true)}).catch(function(){say($("mI"),"Non salvato. Riprova.")}).then(function(){$("saveI").disabled=false})};
 $("iC").onchange=function(){$("saveI").click()};
@@ -171,6 +182,11 @@ $("saveK").onclick=function(){var k=$("sk").value.trim();if(!k)return say($("mK"
   .then(function(){$("saveK").disabled=false})};
 $("delK").onclick=function(){api("DELETE","stripe").then(function(){stripeOn(false);say($("mK"),"Chiave rimossa.",true)})};
 function stripeOn(on){var s=$("stp");s.classList.toggle("on",on);s.querySelector("span").textContent=on?"Stripe collegato":"Stripe non collegato";$("delK").hidden=!on}
+$("saveS").onclick=function(){var cl=$("sCl").value.trim().toLowerCase(),gt=$("sGt").value.trim().toUpperCase();
+ if(cl&&!/^[a-z0-9]{6,20}$/.test(cl))return say($("mS"),"L'ID di Clarity è fatto solo di lettere e numeri (es. k3x9abcd12).");
+ if(gt&&!/^GTM-[A-Z0-9]{4,12}$/.test(gt))return say($("mS"),"L'ID di Tag Manager inizia con GTM-");
+ var b=Object.assign({},I,{clarity:cl,gtm:gt});$("saveS").disabled=true;
+ api("PUT","impostazioni",b).then(function(j){fillI(j);say($("mS"),"Salvato. Le statistiche partono per chi accetta i cookie.",true)}).catch(function(){say($("mS"),"Non salvato. Riprova.")}).then(function(){$("saveS").disabled=false})};
 $("savePw").onclick=function(){var a=$("o1").value,b=$("o2").value;if(b.length<8)return say($("mW"),"La nuova password deve avere almeno 8 caratteri.");
  api("POST","password",{old:a,password:b}).then(function(){$("o1").value=$("o2").value="";say($("mW"),"Password cambiata.",true)}).catch(function(e){say($("mW"),e.code==="bad"?"La password attuale è sbagliata.":"Non cambiata. Riprova.")})};
 
