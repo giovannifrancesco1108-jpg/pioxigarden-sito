@@ -837,3 +837,36 @@ main section.lk-in[id] .hd h2::after,#host.lk-in h2::after,#contatti.lk-in h2::a
 .tel-l input{max-width:none}
 @media (max-width:560px){.bk-or{flex-basis:100%;text-align:center}.bk-act .btn{flex-basis:100%}}
 @media (prefers-reduced-motion:reduce){.bk-t:not([hidden]),.bk.go .bk-card svg{animation:none}}
+
+/* host: tre fatti in evidenza */
+.host-f{list-style:none;margin:6px 0 18px;padding:0;display:flex;flex-wrap:wrap;gap:8px}
+.host-f li{font-size:14px;font-weight:600;padding:7px 13px;border-radius:999px;border:1px solid var(--line2);color:var(--fg);background:rgba(240,193,120,.07)}
+.host-r{margin:-8px 0 14px;color:var(--mute);font-size:15px}
+
+/* niente pulsante "play" di sistema sul video d'apertura (iPhone in risparmio energetico) */
+.hv-v::-webkit-media-controls,.hv-v::-webkit-media-controls-panel,.hv-v::-webkit-media-controls-overlay-play-button,.hv-v::-webkit-media-controls-start-playback-button{display:none!important;-webkit-appearance:none!important;opacity:0!important}
+.hv-v{pointer-events:none}
+
+/* dove siamo: indirizzo, indicazioni e mappa caricata al tocco */
+#dove{padding-block:clamp(56px,8vw,96px)}
+.dove{display:grid;gap:28px;align-items:center}
+@media (min-width:820px){.dove{grid-template-columns:1fr 1.1fr;gap:48px}}
+.dove-t{min-width:0}
+.dove-t>p{max-width:56ch;color:var(--mute)}
+.dove-a{display:flex;align-items:center;gap:10px;font:600 clamp(22px,3vw,28px)/1.2 var(--fd);color:var(--fg)!important;margin:10px 0 14px}
+.dove-a svg,.dove-show svg{width:24px;height:24px;flex:none;fill:none;stroke:var(--gold);stroke-width:1.8;stroke-linejoin:round}
+.dove-b{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+.dove-m{position:relative;aspect-ratio:4/3;max-width:100%;border-radius:24px;overflow:hidden;border:1px solid var(--line2);background:#203a4a;display:grid;place-items:end center;padding-bottom:44px}
+.dove-art{position:absolute;inset:0;width:100%;height:100%}
+.dove-ring{transform-origin:160px 118px;animation:dovePing 2.4s ease-out infinite}
+@keyframes dovePing{from{transform:scale(1);opacity:.9}to{transform:scale(4.2);opacity:0}}
+.dove-show{position:relative;z-index:1}
+.dove-show svg{stroke:currentColor}
+.dove-n{position:absolute;bottom:10px;left:0;right:0;margin:0;text-align:center;font-size:13px;color:rgba(244,236,218,.75)}
+.dove-m iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.dove-m.on .dove-art,.dove-m.on .dove-show,.dove-m.on .dove-n{display:none}
+@media (prefers-reduced-motion:reduce){.dove-ring{animation:none}}
+
+/* pagamento sicuro */
+.pay-sec{display:flex;gap:12px;align-items:flex-start;margin-top:14px!important;padding-top:14px;border-top:1px dashed var(--line2);font-size:15px}
+.pay-sec svg{width:22px;height:22px;flex:none;margin-top:2px;fill:none;stroke:var(--gold);stroke-width:1.8;stroke-linecap:round}

@@ -806,3 +806,8 @@ var a=q.get("paga"),r=q.get("rif");if(a)C.querySelector("[name=amount]").value=a
 if(a||r)fetch("/api/pay-status",{cache:"no-store"}).then(function(x){return x.ok?x.json():{}}).then(function(d){if(d&&d.card){show();if(location.hash==="#carta")C.scrollIntoView({block:"start"})}}).catch(function(){});
 C.querySelector(".pc-f").addEventListener("submit",function(){var b=this.querySelector("button");setTimeout(function(){b.disabled=true},0);try{(window.dataLayer=window.dataLayer||[]).push({event:"card_checkout"})}catch(e){}});
 })();
+
+/* mappa di Viale Pio XI: si carica da Google Maps solo quando la aprite */
+(function(){var M=document.querySelector(".dove-m");if(!M)return;var b=M.querySelector(".dove-show");if(!b)return;
+b.addEventListener("click",function(){if(M.classList.contains("on"))return;var f=document.createElement("iframe");f.src=M.dataset.src;f.title=M.dataset.title||"";f.loading="lazy";f.referrerPolicy="no-referrer-when-downgrade";f.allowFullscreen=true;M.appendChild(f);M.classList.add("on");
+ try{(window.dataLayer=window.dataLayer||[]).push({event:"map_open"})}catch(e){}})})();
