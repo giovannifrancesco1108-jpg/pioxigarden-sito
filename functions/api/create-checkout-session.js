@@ -3,6 +3,8 @@
 // Il sito è statico: invece dell'SDK chiamiamo direttamente l'API REST di Stripe (checkout.sessions.create).
 // Le chiavi stanno SOLO nei segreti di Cloudflare (mai nel codice: il repository è pubblico).
 
+import { stripeKey } from "../../lib/store.js";
+
 const LANGS = ["it", "en", "fr", "de", "es"];
 const NAME = {
   it: "Soggiorno a Pio XI Garden & Lake View Apartment",
@@ -15,7 +17,8 @@ const MIN_EUR = 10;
 const MAX_EUR = 5000;
 
 export async function onRequestPost({ request, env }) {
-  if (!env.STRIPE_SECRET_KEY) {
+  const SK = await stripeKey(env);
+  if (!SK) {
     return new Response("Pagamento con carta non ancora configurato.", { status: 503 });
   }
 
@@ -59,7 +62,7 @@ export async function onRequestPost({ request, env }) {
   const res = await fetch("https://api.stripe.com/v1/checkout/sessions", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
+      Authorization: `Bearer ${SK}`,
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: new URLSearchParams(params),

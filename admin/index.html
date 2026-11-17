@@ -97,6 +97,11 @@ input:focus,button:focus-visible,a:focus-visible{outline:2px solid var(--gold);o
 <section class="card">
  <h2>Pagamenti</h2>
  <div class="row"><span class="pill" id="stp"><i></i><span></span></span></div>
+ <div id="skBox" style="display:grid;gap:10px">
+  <label>Chiave Stripe (inizia con rk_live_)<input type="password" id="sk" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="rk_live_…"></label>
+  <p class="hint">Stripe → Sviluppatori → Chiavi API → la tua chiave limitata → Mostra. La chiave resta solo sul server: nessuno la può rileggere, nemmeno da qui.</p>
+  <div class="row"><button class="btn" type="button" id="saveK">Collega Stripe</button><button class="btn g s" type="button" id="delK" hidden>Scollega</button><p class="msg" id="mK" role="status"></p></div>
+ </div>
  <label class="sw">Pagamento con carta sul sito<input type="checkbox" id="iC"></label>
  <p class="hint">Se lo spegni, resta solo "Invia su WhatsApp".</p>
  <h2 style="font-size:21px;margin-top:6px">Link ai portali</h2>
@@ -159,11 +164,18 @@ $("saveI").onclick=function(){var b={carta:$("iC").checked,booking:$("iB").value
  $("saveI").disabled=true;api("PUT","impostazioni",b).then(function(j){fillI(j);say($("mI"),"Salvato.",true)}).catch(function(){say($("mI"),"Non salvato. Riprova.")}).then(function(){$("saveI").disabled=false})};
 $("iC").onchange=function(){$("saveI").click()};
 
+$("saveK").onclick=function(){var k=$("sk").value.trim();if(!k)return say($("mK"),"Incolla la chiave.");
+ $("saveK").disabled=true;say($("mK"),"Verifica con Stripe…",true);
+ api("PUT","stripe",{key:k}).then(function(j){$("sk").value="";stripeOn(true);say($("mK"),j.live?"Stripe collegato: il pagamento con carta è attivo sul sito.":"Collegato in modalità TEST: per incassare davvero usa la chiave rk_live_.",true)})
+  .catch(function(e){say($("mK"),{wrong_kind:"Questa è la chiave pubblica o l'identificativo: serve quella che inizia con rk_live_.",format:"Non sembra una chiave Stripe: deve iniziare con rk_live_.",invalid:"Stripe dice che la chiave non è valida: copiala di nuovo o creane una nuova.",permissions:"La chiave non ha i permessi: in Stripe dai Scrittura a Checkout Sessions, Prodotti e Prezzi."}[e.code]||"Non collegato. Riprova.")})
+  .then(function(){$("saveK").disabled=false})};
+$("delK").onclick=function(){api("DELETE","stripe").then(function(){stripeOn(false);say($("mK"),"Chiave rimossa.",true)})};
+function stripeOn(on){var s=$("stp");s.classList.toggle("on",on);s.querySelector("span").textContent=on?"Stripe collegato":"Stripe non collegato";$("delK").hidden=!on}
 $("savePw").onclick=function(){var a=$("o1").value,b=$("o2").value;if(b.length<8)return say($("mW"),"La nuova password deve avere almeno 8 caratteri.");
  api("POST","password",{old:a,password:b}).then(function(){$("o1").value=$("o2").value="";say($("mW"),"Password cambiata.",true)}).catch(function(e){say($("mW"),e.code==="bad"?"La password attuale è sbagliata.":"Non cambiata. Riprova.")})};
 
 function app(me){$("app").hidden=false;$("out").hidden=false;
- var s=$("stp");s.classList.toggle("on",!!me.stripe);s.querySelector("span").textContent=me.stripe?"Stripe collegato":"Stripe non collegato: manca la chiave";
+ stripeOn(!!me.stripe);
  api("GET","prezzi").then(fill).catch(function(){});api("GET","impostazioni").then(fillI).catch(function(){})}
 boot();
 })();

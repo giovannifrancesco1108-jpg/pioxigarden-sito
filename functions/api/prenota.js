@@ -1,7 +1,7 @@
 // POST /api/prenota  (JSON: lang, arrival, departure, guests, name, phone)
 // Calcola il totale sul server (notti × prezzo + pulizie) e crea la sessione Stripe Checkout.
 // Risponde { url } e il sito manda l'ospite alla pagina di pagamento di Stripe.
-import { getPrezzi, getImp, nightPrice } from "../../lib/store.js";
+import { getPrezzi, getImp, nightPrice, stripeKey } from "../../lib/store.js";
 
 const LANGS = ["it", "en", "fr", "de", "es"];
 const TXT = {
@@ -16,7 +16,8 @@ const day = (s) => (/^\d{4}-\d{2}-\d{2}$/.test(s || "") ? Date.UTC(+s.slice(0, 4
 const clean = (s, n) => String(s || "").replace(/[\u0000-\u001f]/g, " ").replace(/\s+/g, " ").trim().slice(0, n);
 
 export async function onRequestPost({ request, env }) {
-  if (!env.STRIPE_SECRET_KEY) return json({ error: "card_off" }, 503);
+  const SK = await stripeKey(env);
+  if (!SK) return json({ error: "card_off" }, 503);
   if (!(await getImp(env)).carta) return json({ error: "card_off" }, 503);
   let b;
   try { b = await request.json(); } catch { return json({ error: "bad_request" }, 400); }
@@ -81,7 +82,7 @@ export async function onRequestPost({ request, env }) {
 
   const res = await fetch("https://api.stripe.com/v1/checkout/sessions", {
     method: "POST",
-    headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`, "Content-Type": "application/x-www-form-urlencoded" },
+    headers: { Authorization: `Bearer ${SK}`, "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams(params),
   });
   const session = await res.json();

@@ -1,5 +1,5 @@
 // API del pannello riservato (/admin) e dati pubblici del sito.
-import { COLS, getCol, putJSON, getJSON, getPrezzi, cleanPrezzi, getImp, cleanImp, hashPw, eq, newToken, cookie, isAdmin } from "../lib/store.js";
+import { COLS, getCol, putJSON, getJSON, getPrezzi, cleanPrezzi, getImp, cleanImp, hashPw, eq, newToken, cookie, isAdmin, stripeKey, validStripeKey } from "../lib/store.js";
 
 const J = (o, status = 200, h = {}) => new Response(JSON.stringify(o), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...h } });
 const DAY = 86400;
@@ -46,7 +46,7 @@ export async function admin(req, env, path) {
   if (path === "me") {
     const auth = await env.PX.get("auth", { type: "json" });
     const ok = await isAdmin(req, env);
-    return J({ admin: ok, setup: !auth, stripe: ok ? Boolean(env.STRIPE_SECRET_KEY) : undefined });
+    return J({ admin: ok, setup: !auth, stripe: ok ? Boolean(await stripeKey(env)) : undefined });
   }
   if (path === "setup" && m === "POST") {
     if (await env.PX.get("auth")) return J({ error: "exists" }, 409);
@@ -88,6 +88,21 @@ export async function admin(req, env, path) {
   if (path === "impostazioni") {
     if (m === "GET") return J(await getImp(env));
     if (m === "PUT") { const p = cleanImp(await req.json().catch(() => ({}))); await putJSON(env, "impostazioni", p); return J(p); }
+  }
+  if (path === "stripe") {
+    if (m === "PUT") {
+      const { key } = await req.json().catch(() => ({}));
+      const k = String(key || "").trim();
+      if (/^(pk|mk)_/.test(k)) return J({ error: "wrong_kind" }, 400);
+      if (!validStripeKey(k)) return J({ error: "format" }, 400);
+      // prova la chiave con Stripe prima di salvarla
+      const t = await fetch("https://api.stripe.com/v1/checkout/sessions?limit=1", { headers: { Authorization: `Bearer ${k}` } });
+      if (t.status === 401) return J({ error: "invalid" }, 400);
+      if (t.status === 403) return J({ error: "permissions" }, 400);
+      await env.PX.put("stripe_key", k);
+      return J({ ok: true, live: k.includes("_live_") });
+    }
+    if (m === "DELETE") { await env.PX.delete("stripe_key"); return J({ ok: true }); }
   }
   if (path === "upload" && m === "POST") {
     const type = (req.headers.get("content-type") || "").split(";")[0];
