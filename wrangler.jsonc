@@ -1,0 +1,12 @@
+{
+  // Configurazione per Cloudflare Workers (sito statico + API Stripe).
+  "name": "pioxigarden-sito",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-06-01",
+  "assets": {
+    "directory": "./",
+    "binding": "ASSETS",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page"
+  }
+}

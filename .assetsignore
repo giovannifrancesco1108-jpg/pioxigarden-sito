@@ -1,0 +1,9 @@
+.git
+.github
+functions
+worker
+wrangler.jsonc
+wrangler.toml
+.assetsignore
+node_modules
+*.md
