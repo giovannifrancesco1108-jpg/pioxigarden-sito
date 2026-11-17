@@ -1,7 +1,7 @@
 // POST /api/prenota  (JSON: lang, arrival, departure, guests, name, phone)
 // Calcola il totale sul server (notti × prezzo + pulizie) e crea la sessione Stripe Checkout.
 // Risponde { url } e il sito manda l'ospite alla pagina di pagamento di Stripe.
-import { getPrezzi, getImp, nightPrice, stripeKey } from "../../lib/store.js";
+import { getPrezzi, getImp, nightPrice, stripeKey, createCheckout } from "../../lib/store.js";
 
 const LANGS = ["it", "en", "fr", "de", "es"];
 const TXT = {
@@ -80,15 +80,7 @@ export async function onRequestPost({ request, env }) {
     });
   }
 
-  const res = await fetch("https://api.stripe.com/v1/checkout/sessions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${SK}`, "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams(params),
-  });
-  const session = await res.json();
-  if (!res.ok) {
-    console.log("Stripe Checkout error:", session.error && session.error.message);
-    return json({ error: "stripe" }, 502);
-  }
-  return json({ url: session.url });
+  const r = await createCheckout(SK, params);
+  if (!r.ok) return json({ error: "stripe", detail: (r.j.error && r.j.error.message) || String(r.status) }, 502);
+  return json({ url: r.j.url });
 }

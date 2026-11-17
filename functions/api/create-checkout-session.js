@@ -3,7 +3,7 @@
 // Il sito è statico: invece dell'SDK chiamiamo direttamente l'API REST di Stripe (checkout.sessions.create).
 // Le chiavi stanno SOLO nei segreti di Cloudflare (mai nel codice: il repository è pubblico).
 
-import { stripeKey } from "../../lib/store.js";
+import { stripeKey, createCheckout } from "../../lib/store.js";
 
 const LANGS = ["it", "en", "fr", "de", "es"];
 const NAME = {
@@ -59,18 +59,7 @@ export async function onRequestPost({ request, env }) {
     cancel_url: `${back}?paga=${amount / 100}&rif=${encodeURIComponent(ref)}#carta`,
   };
 
-  const res = await fetch("https://api.stripe.com/v1/checkout/sessions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${SK}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: new URLSearchParams(params),
-  });
-  const session = await res.json();
-  if (!res.ok) {
-    console.log("Stripe Checkout error:", session.error && session.error.message);
-    return Response.redirect(`${back}?pagamento=errore#carta`, 303);
-  }
-  return Response.redirect(session.url, 303);
+  const r = await createCheckout(SK, params);
+  if (!r.ok) return Response.redirect(`${back}?pagamento=errore#carta`, 303);
+  return Response.redirect(r.j.url, 303);
 }

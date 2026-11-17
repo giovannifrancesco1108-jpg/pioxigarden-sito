@@ -210,9 +210,9 @@ form.addEventListener("submit",function(e){e.preventDefault();var f=data();msg.c
   sbc.disabled=true;var lb=sbc.querySelector("span"),old=lb.textContent;lb.textContent=U.paying;bk.classList.add("go");
   track("begin_checkout",{value:+bkt.dataset.tot||0,currency:"EUR"});
   fetch("/api/prenota",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(f)})
-   .then(function(r){return r.json().then(function(j){if(!r.ok||!j.url)throw new Error(j.error||r.status);return j})})
+   .then(function(r){return r.json().then(function(j){if(!r.ok||!j.url){var e=new Error(j.error||r.status);e.detail=j.detail;throw e}return j})})
    .then(function(j){location.href=j.url})
-   .catch(function(){msg.className="msg bad";msg.textContent=U.payErr;sbc.disabled=false;lb.textContent=old;bk.classList.remove("go")});
+   .catch(function(er){msg.className="msg bad";msg.textContent=U.payErr+(document.documentElement.classList.contains("px-admin")&&er&&er.detail?" [Stripe: "+er.detail+"]":"");try{console.warn("Stripe:",er&&er.detail)}catch(x){}sbc.disabled=false;lb.textContent=old;bk.classList.remove("go")});
   return}
  links(f);var t=phone?$("#cw"):null;if(t){track("generate_lead",{method:"whatsapp"});location.href=t.href}else{msg.className="msg bad";msg.textContent=U.err}});
 /* ritorno da Stripe */
