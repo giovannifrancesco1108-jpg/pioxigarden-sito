@@ -170,8 +170,22 @@ links();
 
 // form
 var form=$("#rq");if(!form)return;
+/* testi del checkout veloce (le altre scritte arrivano dalla pagina, in PX.ui) */
+var BK={
+ it:{qd:["Questo weekend","Weekend prossimo","Una settimana"],ci:"check-in 14–16",co:"check-out entro le 11",g1:"ospite",gN:"ospiti",payN:"Paga {t} con carta",stamp:"Pagamento sicuro",
+  dH:"Prenotazione confermata",dP:"Dal {a} al {d}, {g}. Vi scriviamo su WhatsApp con le indicazioni per l’arrivo.",dHw:"Pagamento in elaborazione",dPw:"Stripe sta completando il pagamento: vi scriviamo appena è confermato.",cal:"Aggiungi al calendario",map:"Come arrivare",wa:"Scriveteci su WhatsApp",waM:"Buongiorno! Ho appena prenotato dal sito: arrivo il {a}, partenza il {d}, {g}."},
+ en:{qd:["This weekend","Next weekend","One week"],ci:"check-in 2–4 pm",co:"check-out by 11 am",g1:"guest",gN:"guests",payN:"Pay {t} by card",stamp:"Secure payment",
+  dH:"Booking confirmed",dP:"From {a} to {d}, {g}. We’ll message you on WhatsApp with directions for your arrival.",dHw:"Payment processing",dPw:"Stripe is completing the payment: we’ll message you as soon as it’s confirmed.",cal:"Add to calendar",map:"Get directions",wa:"Message us on WhatsApp",waM:"Hello! I’ve just booked on your website: arriving {a}, leaving {d}, {g}."},
+ fr:{qd:["Ce week-end","Le week-end prochain","Une semaine"],ci:"arrivée 14 h – 16 h",co:"départ avant 11 h",g1:"voyageur",gN:"voyageurs",payN:"Payer {t} par carte",stamp:"Paiement sécurisé",
+  dH:"Réservation confirmée",dP:"Du {a} au {d}, {g}. Nous vous écrivons sur WhatsApp avec les indications pour votre arrivée.",dHw:"Paiement en cours",dPw:"Stripe finalise le paiement : nous vous écrivons dès qu’il est confirmé.",cal:"Ajouter au calendrier",map:"Itinéraire",wa:"Écrivez-nous sur WhatsApp",waM:"Bonjour ! Je viens de réserver sur votre site : arrivée le {a}, départ le {d}, {g}."},
+ de:{qd:["Dieses Wochenende","Nächstes Wochenende","Eine Woche"],ci:"Check-in 14–16 Uhr",co:"Check-out bis 11 Uhr",g1:"Gast",gN:"Gäste",payN:"{t} mit Karte bezahlen",stamp:"Sichere Zahlung",
+  dH:"Buchung bestätigt",dP:"Vom {a} bis {d}, {g}. Wir schreiben Ihnen per WhatsApp mit der Wegbeschreibung.",dHw:"Zahlung wird bearbeitet",dPw:"Stripe schließt die Zahlung ab: Wir melden uns, sobald sie bestätigt ist.",cal:"Zum Kalender hinzufügen",map:"Route planen",wa:"Per WhatsApp schreiben",waM:"Hallo! Ich habe gerade auf Ihrer Website gebucht: Anreise {a}, Abreise {d}, {g}."},
+ es:{qd:["Este fin de semana","El próximo fin de semana","Una semana"],ci:"entrada 14–16 h",co:"salida antes de las 11",g1:"huésped",gN:"huéspedes",payN:"Pagar {t} con tarjeta",stamp:"Pago seguro",
+  dH:"Reserva confirmada",dP:"Del {a} al {d}, {g}. Te escribimos por WhatsApp con las indicaciones para llegar.",dHw:"Pago en proceso",dPw:"Stripe está completando el pago: te escribimos en cuanto se confirme.",cal:"Añadir al calendario",map:"Cómo llegar",wa:"Escríbenos por WhatsApp",waM:"¡Hola! Acabo de reservar en vuestra web: llegada el {a}, salida el {d}, {g}."}
+}[PX.lang]||null;
+if(!BK)BK={qd:["Weekend","Next weekend","Week"],ci:"",co:"",g1:"",gN:"",payN:"{t}",stamp:"",dH:"",dP:"",dHw:"",dPw:"",cal:"",map:"",wa:"",waM:""};
 var dx=$("#dx");if(dx)dx.addEventListener("click",function(){$("#done").classList.remove("on")});
-var d1=$("#d1"),d2=$("#d2"),nn=$("#nn"),msg=$("#fm"),btn=$("#sb"),done=$("#done");
+var d1=$("#d1"),d2=$("#d2"),nn=$("#nn"),msg=$("#fm"),btn=$("#sb"),done=$("#done"),gg=$("#gg"),nm=$("#nm"),tl=$("#tl");
 var today=new Date();today.setMinutes(today.getMinutes()-today.getTimezoneOffset());var iso=today.toISOString().slice(0,10);
 d1.min=iso;d2.min=iso;
 function nights(){if(!d1.value||!d2.value)return 0;return Math.round((new Date(d2.value)-new Date(d1.value))/864e5)}
@@ -180,46 +194,97 @@ function upd(){if(d1.value){var n=new Date(d1.value);n.setDate(n.getDate()+1);d2
 d1.addEventListener("change",function(){if(d2.value&&d2.value<=d1.value)d2.value="";upd()});d2.addEventListener("change",upd);upd();
 function data(){var g=function(i){var el=document.getElementById(i);return el?el.value.trim():""};
  return {lang:PX.lang,arrival:d1.value,departure:d2.value,guests:g("gg"),name:g("nm"),phone:g("tl"),website:g("hp")}}
-form.addEventListener("input",function(){links(data());sum()});
-form.addEventListener("change",sum);
-/* riepilogo e pagamento con carta (Stripe) */
-var bk=$("#bk"),bkt=$("#bkt"),sbc=$("#sbc"),bkor=$("#bkor"),bkn=$("#bkn"),CFG=null,via="wa";
+/* bozza: date, ospiti, nome e telefono restano in questo browser solo per la visita (se si torna indietro da Stripe non si riscrive niente);
+   un link può arrivare già con le date: ?arrivo=2026-12-18&partenza=2026-12-20&ospiti=2 */
+var KEY="pxbk";
+function save(){try{sessionStorage.setItem(KEY,JSON.stringify({a:d1.value,b:d2.value,g:gg?gg.value:"",n:nm?nm.value:"",t:tl?tl.value:""}))}catch(e){}}
+(function(){var o=null;try{o=JSON.parse(sessionStorage.getItem(KEY)||"null")}catch(e){}
+ var Q=new URLSearchParams(location.search),qa=Q.get("arrivo")||Q.get("arrival"),qb=Q.get("partenza")||Q.get("departure"),qg=Q.get("ospiti")||Q.get("guests");
+ var ok=function(s){return /^\d{4}-\d{2}-\d{2}$/.test(s||"")&&s>=iso};
+ var a=ok(qa)?qa:(o&&ok(o.a)?o.a:""),b=ok(qa)?(ok(qb)&&qb>qa?qb:""):(o&&ok(o.b)&&o.b>a?o.b:"");
+ if(a&&!d1.value){d1.value=a;d2.value=b}
+ var g=+(qg||(o&&o.g)||0);if(gg&&g>=1&&g<=gg.options.length)gg.value=String(g);
+ if(o){if(o.n&&nm&&!nm.value)nm.value=o.n;if(o.t&&tl&&!tl.value)tl.value=o.t}
+ upd();if(a||g)setTimeout(function(){[d1,gg].forEach(function(x){if(x)x.dispatchEvent(new Event("change",{bubbles:true}))})},0)})();
+form.addEventListener("input",function(){links(data());sum();save()});
+form.addEventListener("change",function(){sum();save()});
+/* scorciatoie per le date: un tocco e arrivo e partenza sono scelti */
+(function(){var host=$("#lc");if(!host||!BK.qd)return;var box=document.createElement("div");box.className="qd";box.setAttribute("role","group");host.parentNode.insertBefore(box,host);
+ var fS=new Intl.DateTimeFormat(PX.lang,{weekday:"short",day:"numeric",timeZone:"UTC"}),T0=new Date(iso+"T12:00:00Z");
+ function add(d,k){return new Date(d.getTime()+k*864e5)}function s(d){return d.toISOString().slice(0,10)}
+ var w=T0.getUTCDay(),fri=add(T0,w===5?0:w===6?-1:w===0?5:5-w),a1=w===6?T0:fri,b1=add(fri,2);
+ var opts=[[a1,b1],[add(fri,7),add(fri,9)],[add(fri,8),add(fri,15)]];
+ box.innerHTML=opts.map(function(o,i){return '<button type="button" class="qd-b" data-a="'+s(o[0])+'" data-b="'+s(o[1])+'"><b>'+BK.qd[i]+'</b><small>'+fS.format(o[0])+' – '+fS.format(o[1])+'</small></button>'}).join("");
+ box.addEventListener("click",function(e){var b=e.target.closest(".qd-b");if(!b)return;var a=b.dataset.a,z=b.dataset.b;
+  if(CFG&&CFG.min){var mn=s(add(new Date(a+"T12:00:00Z"),CFG.min));if(z<mn)z=mn}
+  d1.value=a;d1.dispatchEvent(new Event("change",{bubbles:true}));d2.value=z;d2.dispatchEvent(new Event("change",{bubbles:true}));
+  $$(".qd-b",box).forEach(function(x){x.setAttribute("aria-pressed",String(x===b))});save()});
+ form.addEventListener("change",function(e){if(e.target===d1||e.target===d2)$$(".qd-b",box).forEach(function(x){x.setAttribute("aria-pressed",String(x.dataset.a===d1.value&&x.dataset.b===d2.value))})})})();
+/* riepilogo a biglietto e pagamento con carta (Stripe) */
+var bk=$("#bk"),bkt=$("#bkt"),sbc=$("#sbc"),bkor=$("#bkor"),bkn=$("#bkn"),CFG=null,CARD=false,via="wa";
+var sbcL=sbc?$("span",sbc):null,sbcT=sbcL?sbcL.textContent:"";
 var eur=function(v){return new Intl.NumberFormat(PX.lang,{style:"currency",currency:"EUR",maximumFractionDigits:v%1?2:0}).format(v)};
+var fD=new Intl.DateTimeFormat(PX.lang,{weekday:"short",day:"numeric",month:"short",timeZone:"UTC"});
+var D=function(s){return new Date(s+"T12:00:00Z")};
 function np(iso){var x=(CFG.stagioni||[]).filter(function(z){return iso>=z.dal&&iso<=z.al})[0];if(x)return x.notte;var w=new Date(iso+"T12:00:00Z").getUTCDay();return (w===5||w===6)&&CFG.weekend!=null?CFG.weekend:CFG.notte}
+function gl(g){return g+" "+(g===1?BK.g1:BK.gN)}
 function sum(){if(!CFG||!bkt)return;var n=nights();
- if(n<1){bkt.hidden=true;return}
- var st=0,ps={},t0=new Date(d1.value+"T12:00:00Z");for(var k=0;k<n;k++){var v=np(new Date(t0.getTime()+k*864e5).toISOString().slice(0,10));st+=v;ps[v]=(ps[v]||0)+1}
- var tot=st+CFG.pulizie,rows=Object.keys(ps).sort(function(a,b){return a-b}).map(function(v){var c=ps[v];return '<div class="bk-r"><span>'+c+' '+(c===1?U.n1:U.nN)+' × '+eur(+v)+'</span><span>'+eur(c*v)+'</span></div>'}).join("");
- bkt.innerHTML='<p class="bk-h">'+U.bkT+'</p>'+rows+
+ if(n<1){bkt.hidden=true;if(sbcL&&!sbc.disabled)sbcL.textContent=sbcT;return}
+ var st=0,ps={},t0=D(d1.value);for(var k=0;k<n;k++){var v=np(new Date(t0.getTime()+k*864e5).toISOString().slice(0,10));st+=v;ps[v]=(ps[v]||0)+1}
+ var tot=st+CFG.pulizie,g=+(gg?gg.value:2),rows=Object.keys(ps).sort(function(a,b){return a-b}).map(function(v){var c=ps[v];return '<div class="bk-r"><span>'+c+' '+(c===1?U.n1:U.nN)+' × '+eur(+v)+'</span><span>'+eur(c*v)+'</span></div>'}).join("");
+ bkt.innerHTML='<div class="tk-top"><span><small>'+U.arr+'</small><b>'+fD.format(D(d1.value))+'</b><i>'+BK.ci+'</i></span>'+
+  '<svg class="tk-boat" viewBox="0 0 40 20" aria-hidden="true"><path d="M4 12h32l-5 6H9z"/><path d="M20 2v10M20 3l8 8h-8"/></svg>'+
+  '<span><small>'+U.dep+'</small><b>'+fD.format(D(d2.value))+'</b><i>'+BK.co+'</i></span></div>'+
+  '<p class="tk-sub">'+n+' '+(n===1?U.n1:U.nN)+' · '+gl(g)+'</p>'+rows+
   (CFG.pulizie?'<div class="bk-r"><span>'+U.cln+'</span><span>'+eur(CFG.pulizie)+'</span></div>':'')+
   '<svg class="bk-wv" viewBox="0 0 120 8" preserveAspectRatio="none" aria-hidden="true"><path d="M0 4q7.5-4 15 0t15 0 15 0 15 0 15 0 15 0 15 0 15 0"/></svg>'+
-  '<div class="bk-r bk-tot"><span>'+U.tot+'</span><b>'+eur(tot)+'</b></div>';
+  '<div class="bk-r bk-tot"><span>'+U.tot+'</span><b>'+eur(tot)+'</b></div><span class="tk-stamp" aria-hidden="true">'+BK.stamp+'</span>';
+ if(sbcL&&!sbc.disabled&&CARD)sbcL.textContent=BK.payN.replace("{t}",eur(tot));
  var prev=+bkt.dataset.tot||0;bkt.dataset.tot=tot;bkt.hidden=false;
- var tb=bkt.querySelector(".bk-tot b");if(tb&&prev&&prev!==tot&&!(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches)){var t0=performance.now();
-  (function step(t){var k=Math.min(1,(t-t0)/600),e=1-Math.pow(1-k,3);tb.textContent=eur(Math.round(prev+(tot-prev)*e));if(k<1)requestAnimationFrame(step);else{tb.textContent=eur(tot);tb.classList.add("tick");setTimeout(function(){tb.classList.remove("tick")},520)}})(t0)}}
-fetch("/api/pay-status",{cache:"no-store"}).then(function(r){return r.ok?r.json():null}).then(function(d){if(!d||!d.card)return;CFG=d;
- sbc.hidden=false;bkor.hidden=false;bk.classList.add("on");bkn.textContent=U.note;sum()}).catch(function(){});
+ var tb=bkt.querySelector(".bk-tot b");if(tb&&prev&&prev!==tot&&!RM.matches){var t1=performance.now();
+  (function step(t){var q=Math.min(1,(t-t1)/600),e=1-Math.pow(1-q,3);tb.textContent=eur(Math.round(prev+(tot-prev)*e));if(q<1)requestAnimationFrame(step);else{tb.textContent=eur(tot);tb.classList.add("tick");setTimeout(function(){tb.classList.remove("tick")},520)}})(t1)}}
+/* prezzi sempre visibili; la carta solo se Stripe è attivo. Il «da … €» della pagina segue i prezzi dell'area riservata */
+fetch("/api/pay-status",{cache:"no-store"}).then(function(r){return r.ok?r.json():null}).then(function(d){if(!d||d.notte==null)return;CFG=d;CARD=!!d.card;
+ var v=[d.notte];if(d.weekend!=null)v.push(d.weekend);(d.stagioni||[]).forEach(function(s){v.push(s.notte)});var mp=Math.min.apply(null,v.filter(function(x){return x>0}));
+ if(isFinite(mp))$$(".fbar b,.chip b").forEach(function(b){if(/€/.test(b.textContent))b.textContent=b.textContent.replace(/\d+(?:[.,]\d+)?/,String(mp))});
+ if(CARD){sbc.hidden=false;bkor.hidden=false;bk.classList.add("on");bkn.textContent=U.note}
+ sum()}).catch(function(){});
 [sbc,btn].forEach(function(b){if(b)b.addEventListener("click",function(){via=b.dataset.via})});
-form.addEventListener("submit",function(e){e.preventDefault();var f=data();msg.className="msg";msg.textContent="";
+function bad(t,el){msg.className="msg bad";msg.textContent=t;if(el&&el.scrollIntoView)try{el.scrollIntoView({block:"center",behavior:RM.matches?"auto":"smooth"})}catch(x){}}
+form.addEventListener("submit",function(e){e.preventDefault();var f=data();msg.className="msg";msg.textContent="";var chk=$(".chk",form);chk.classList.remove("err");
  if(e.submitter&&e.submitter.dataset.via)via=e.submitter.dataset.via;
  if(f.website)return;
- if(!f.name||f.phone.replace(/\D/g,"").length<6){msg.className="msg bad";msg.textContent=U.errReq;return}
- if(f.arrival&&f.departure&&f.departure<=f.arrival){msg.className="msg bad";msg.textContent=U.errDates;return}
- if(!$(".chk input",form).checked){msg.className="msg bad";msg.textContent=U.errConsent;return}
- if(via==="card"&&CFG){
-  if(!(nights()>0)){msg.className="msg bad";msg.textContent=U.errNoDates;return}
-  if(nights()<(CFG.min||1)){msg.className="msg bad";msg.textContent=(U.errMin||"Min: ")+CFG.min+" "+U.nN+".";return}
-  sbc.disabled=true;var lb=sbc.querySelector("span"),old=lb.textContent;lb.textContent=U.paying;bk.classList.add("go");
+ if(via==="card"&&CARD&&!(nights()>0)){bad(U.errNoDates,$("#lc"));return}
+ if(!f.name||digits(f.phone).length<6){bad(U.errReq,f.name?tl:nm);return}
+ if(f.arrival&&f.departure&&f.departure<=f.arrival){bad(U.errDates,$("#lc"));return}
+ if(!$("input",chk).checked){chk.classList.add("err");bad(U.errConsent,chk);return}
+ if(via==="card"&&CARD){
+  if(nights()<(CFG.min||1)){bad((U.errMin||"Min: ")+CFG.min+" "+U.nN+".",$("#lc"));return}
+  sbc.disabled=true;sbcL.textContent=U.paying;bk.classList.add("go");
   track("begin_checkout",{value:+bkt.dataset.tot||0,currency:"EUR"});
   fetch("/api/prenota",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(f)})
    .then(function(r){return r.json().then(function(j){if(!r.ok||!j.url){var e=new Error(j.error||r.status);e.detail=j.detail;throw e}return j})})
    .then(function(j){location.href=j.url})
-   .catch(function(er){msg.className="msg bad";msg.textContent=U.payErr+(document.documentElement.classList.contains("px-admin")&&er&&er.detail?" [Stripe: "+er.detail+"]":"");try{console.warn("Stripe:",er&&er.detail)}catch(x){}sbc.disabled=false;lb.textContent=old;bk.classList.remove("go")});
+   .catch(function(er){bad(U.payErr+(document.documentElement.classList.contains("px-admin")&&er&&er.detail?" [Stripe: "+er.detail+"]":""));try{console.warn("Stripe:",er&&er.detail)}catch(x){}sbc.disabled=false;bk.classList.remove("go");sbcL.textContent=sbcT;sum()});
   return}
- links(f);var t=phone?$("#cw"):null;if(t){track("generate_lead",{method:"whatsapp"});location.href=t.href}else{msg.className="msg bad";msg.textContent=U.err}});
-/* ritorno da Stripe */
-var Q=new URLSearchParams(location.search);if(Q.get("prenotato")==="ok"&&done){done.classList.add("on");track("purchase",{method:"card"});
- try{history.replaceState(null,"",location.pathname+"#contatti")}catch(e){}}
+ links(f);var t=phone?$("#cw"):null;if(t){track("generate_lead",{method:"whatsapp"});location.href=t.href}else bad(U.err)});
+/* ritorno da Stripe: il server verifica il pagamento e restituisce solo date, ospiti e importo */
+var Q=new URLSearchParams(location.search);
+if(Q.get("prenotato")==="ok"&&done){done.classList.add("on");var sid=Q.get("session_id")||"";
+ try{sessionStorage.removeItem(KEY)}catch(e){}
+ try{history.replaceState(null,"",location.pathname+"#contatti")}catch(e){}
+ if(/^cs_(live|test)_\w+$/.test(sid))fetch("/api/pay-status?session_id="+encodeURIComponent(sid),{cache:"no-store"}).then(function(r){return r.json()}).then(function(v){if(!v||!v.arrival)return;
+  var a=fD.format(D(v.arrival)),z=fD.format(D(v.departure)),gs=gl(v.guests||1),h=$("h3",done),p=$("p",done);
+  if(h)h.textContent=v.paid?BK.dH:BK.dHw;if(p)p.textContent=v.paid?BK.dP.replace("{a}",a).replace("{d}",z).replace("{g}",gs):BK.dPw;
+  if(v.paid)track("purchase",{method:"card",value:v.total||0,currency:"EUR",transaction_id:sid});
+  var ics=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Pio XI Garden//IT","BEGIN:VEVENT","UID:"+sid+"@pioxigarden.com","DTSTAMP:"+new Date().toISOString().replace(/[-:]/g,"").slice(0,15)+"Z",
+   "DTSTART;VALUE=DATE:"+v.arrival.replace(/-/g,""),"DTEND;VALUE=DATE:"+v.departure.replace(/-/g,""),"SUMMARY:Pio XI Garden & Lake View Apartment","LOCATION:Viale Pio XI 31b\\, 00040 Castel Gandolfo (RM)",
+   "DESCRIPTION:"+(BK.ci+" · "+BK.co).replace(/,/g,"\\,")+(phone?" · WhatsApp +"+phone:""),"END:VEVENT","END:VCALENDAR"].join("\r\n");
+  var acts=document.createElement("div");acts.className="done-a";
+  acts.innerHTML='<a class="btn s" download="pio-xi.ics" href="data:text/calendar;charset=utf-8,'+encodeURIComponent(ics)+'">'+BK.cal+'</a>'+
+   '<a class="btn g s" href="https://www.google.com/maps/dir/?api=1&amp;destination=Viale+Pio+XI+31b,+00040+Castel+Gandolfo+RM" rel="noopener" target="_blank">'+BK.map+'</a>'+
+   (phone?'<a class="btn g s" href="https://wa.me/'+phone+'?text='+encodeURIComponent(BK.waM.replace("{a}",a).replace("{d}",z).replace("{g}",gs))+'" rel="noopener" target="_blank">'+BK.wa+'</a>':'');
+  var x=$("#dx");if(x)done.insertBefore(acts,x);else done.appendChild(acts)}).catch(function(){})}
 })();
 
 /* ---------- a tema lago: calendario a onde, ospiti, increspature, riflessi ---------- */
@@ -287,6 +352,50 @@ if(gg){var max=gg.options.length,wrap=document.createElement("div");wrap.classNa
   $$(".lg-b",wrap)[0].disabled=v<=1;$$(".lg-b",wrap)[1].disabled=v>=max}
  wrap.addEventListener("click",function(e){var b=e.target.closest(".lg-b");if(!b)return;var v=Math.min(max,Math.max(1,+gg.value+ +b.dataset.s));gg.value=String(v);fire(gg);gupd()});
  gg.addEventListener("change",gupd);gupd();if(form)form.addEventListener("reset",function(){setTimeout(gupd,0)})}
+})();
+
+/* ---------- prenotazione veloce: ogni «Prenota» apre il modulo in un pannello, senza scorrere la pagina ----------
+   Il modulo è lo stesso della sezione Contatti: si sposta nel pannello e torna al suo posto quando si chiude.
+   I pulsanti di pagamento restano sempre in basso, con il totale. Il tasto indietro del telefono chiude il pannello. */
+(function(){
+"use strict";
+var form=document.getElementById("rq");if(!form||!window.HTMLDialogElement)return;
+var PX=window.PX||{},T={it:{t:"Prenota il tuo soggiorno",x:"Chiudi",s:["Date","Ospiti","Pagamento"]},en:{t:"Book your stay",x:"Close",s:["Dates","Guests","Payment"]},
+ fr:{t:"Réserver votre séjour",x:"Fermer",s:["Dates","Voyageurs","Paiement"]},de:{t:"Aufenthalt buchen",x:"Schließen",s:["Daten","Gäste","Zahlung"]},es:{t:"Reserva tu estancia",x:"Cerrar",s:["Fechas","Huéspedes","Pago"]}}[PX.lang]||null;
+if(!T)return;
+var boat='<svg viewBox="0 0 40 20" aria-hidden="true"><path d="M4 12h32l-5 6H9z"/><path d="M20 2v10M20 3l8 8h-8"/></svg>';
+var dlg=document.createElement("dialog");dlg.className="bks";dlg.setAttribute("aria-labelledby","bksT");
+dlg.innerHTML='<div class="bks-hd"><p class="bks-t" id="bksT">'+T.t+'</p><button type="button" class="bks-x" aria-label="'+T.x+'"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>'+
+ '<div class="bks-trip" aria-hidden="true"><svg class="bks-wv" viewBox="0 0 300 12" preserveAspectRatio="none"><path d="M0 7q12.5-6 25 0t25 0 25 0 25 0 25 0 25 0 25 0 25 0 25 0 25 0 25 0 25 0"/></svg><span class="bks-boat">'+boat+'</span></div>'+
+ '<ol class="bks-st">'+T.s.map(function(s){return "<li>"+s+"</li>"}).join("")+'</ol></div><div class="bks-bd"></div><div class="bks-ft"></div>';
+document.body.appendChild(dlg);
+var bd=dlg.querySelector(".bks-bd"),ft=dlg.querySelector(".bks-ft"),act=form.querySelector(".bk-act"),fm=document.getElementById("fm");
+var spots=[[form],[fm],[act]].filter(function(x){return x[0]}).map(function(x){return {el:x[0],m:document.createComment("posto")}});
+if(act)[].forEach.call(act.querySelectorAll("button"),function(b){b.setAttribute("form","rq");var s=b.querySelector("span");if(s&&!b.getAttribute("aria-label")&&b.id==="sb")b.setAttribute("aria-label",s.textContent)});
+var norm=function(p){return p.replace(/index\.html$/,"")};
+function warm(){if(warm.d)return;warm.d=1;["https://checkout.stripe.com","https://b.stripecdn.com"].forEach(function(h){var l=document.createElement("link");l.rel="preconnect";l.href=h;l.crossOrigin="";document.head.appendChild(l)})}
+function prog(){var s=0,v=function(i){var e=document.getElementById(i);return e?e.value.trim():""};
+ if(v("d1")&&v("d2"))s=1;if(s&&v("nm")&&v("tl").replace(/\D/g,"").length>=6)s=2;var c=form.querySelector(".chk input");if(s===2&&c&&c.checked)s=3;var dn=document.getElementById("done");if(dn&&dn.classList.contains("on"))s=3;
+ dlg.style.setProperty("--st",String(s/3));[].forEach.call(dlg.querySelectorAll(".bks-st li"),function(li,i){li.classList.toggle("on",i<s)})}
+function open(push){if(dlg.open)return;
+ [].forEach.call(document.querySelectorAll("dialog[open]"),function(d){if(d!==dlg)d.close()});
+ spots.forEach(function(p){p.el.parentNode.insertBefore(p.m,p.el)});bd.appendChild(form);if(fm)ft.appendChild(fm);if(act)ft.appendChild(act);
+ document.documentElement.classList.add("bks-on");dlg.showModal();bd.tabIndex=-1;try{bd.focus({preventScroll:true})}catch(e){}bd.scrollTop=0;warm();prog();
+ if(push!==false)try{history.pushState({bks:1},"",location.pathname+location.search+"#prenota")}catch(e){}
+ setTimeout(function(){window.dispatchEvent(new Event("resize"))},40)}
+dlg.addEventListener("close",function(){
+ spots.forEach(function(p){if(p.m.parentNode){p.m.parentNode.insertBefore(p.el,p.m);p.m.parentNode.removeChild(p.m)}});
+ document.documentElement.classList.remove("bks-on");
+ if(history.state&&history.state.bks)try{history.back()}catch(e){}
+ setTimeout(function(){window.dispatchEvent(new Event("resize"))},40)});
+dlg.querySelector(".bks-x").addEventListener("click",function(){dlg.close()});
+dlg.addEventListener("click",function(e){if(e.target===dlg)dlg.close()});
+var dx=document.getElementById("dx");if(dx)dx.addEventListener("click",function(){if(dlg.open)dlg.close()});
+addEventListener("popstate",function(){if(dlg.open&&!(history.state&&history.state.bks))dlg.close()});
+document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[href]");if(!a||a.hash!=="#contatti"||norm(a.pathname)!==norm(location.pathname)||e.defaultPrevented)return;e.preventDefault();open()},true);
+form.addEventListener("input",prog);form.addEventListener("change",prog);
+var h=location.hash;if(h==="#prenota"||h==="#contatti")setTimeout(function(){open(false)},h==="#contatti"?300:0);
+window.PXbook=open;
 })();
 
 /* ---------- vetrina delle foto, a tutta larghezza, e foto a schermo intero ---------- */
