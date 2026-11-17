@@ -8,3 +8,5 @@ wrangler.toml
 node_modules
 *.md
 lib
+.wrangler
+.dev.vars
