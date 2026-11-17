@@ -829,9 +829,9 @@ F.forEach(function(f){if(f.classList.contains("sv"))io.observe(f)})})();
 /* barchetta sulla mappa: ferma se preferite meno movimento */
 (function(){var s=document.querySelector(".dove-art");if(s&&s.pauseAnimations&&window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches)s.pauseAnimations()})();
 
-/* il lago dall'alto: carica il 3D solo quando la sezione sta per comparire */
-(function(){var S=document.getElementById("lago3d");if(!S)return;
+/* lo spot a cartone: carica il 3D solo quando la sezione sta per arrivare, così l'apertura resta leggera */
+(function(){var S=document.getElementById("spot");if(!S)return;
 function ok(){try{var c=document.createElement("canvas");return !!(c.getContext("webgl2")||c.getContext("webgl"))}catch(e){return false}}
-if(!ok()||!("IntersectionObserver" in window)){S.classList.add("l3-off");return}
-var go=function(){var s=document.createElement("script");s.type="module";s.src=S.dataset.js||"../assets/lago3d.js?v=1";s.onerror=function(){S.classList.add("l3-off")};document.head.appendChild(s)};
-var io=new IntersectionObserver(function(es){if(es[0].isIntersecting){io.disconnect();go()}},{rootMargin:"600px 0px"});io.observe(S)})();
+if(!ok()||!("IntersectionObserver" in window)){S.classList.add("sp-off");return}
+var go=function(){var s=document.createElement("script");s.type="module";s.src=S.dataset.js;s.onerror=function(){S.classList.add("sp-off")};document.head.appendChild(s)};
+var io=new IntersectionObserver(function(es){if(es[0].isIntersecting){io.disconnect();go()}},{rootMargin:"1000px 0px"});io.observe(S)})();
