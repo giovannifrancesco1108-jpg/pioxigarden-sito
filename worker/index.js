@@ -2,11 +2,13 @@
 import * as checkout from "../functions/api/create-checkout-session.js";
 import * as webhook from "../functions/api/webhook.js";
 import * as payStatus from "../functions/api/pay-status.js";
+import * as prenota from "../functions/api/prenota.js";
 
 const ROUTES = {
   "/api/create-checkout-session": { POST: checkout.onRequestPost },
   "/api/webhook": { POST: webhook.onRequestPost },
   "/api/pay-status": { GET: payStatus.onRequestGet },
+  "/api/prenota": { POST: prenota.onRequestPost },
 };
 
 export default {

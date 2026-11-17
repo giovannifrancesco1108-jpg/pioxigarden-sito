@@ -157,7 +157,7 @@ $$("dialog:not(.tour)").forEach(function(d){d.addEventListener("click",function(
 // contatti
 function digits(s){return String(s||"").replace(/\D/g,"")}
 var phone=digits(PX.phone),email=PX.email||"";
-function body(f){var l=[U.hello,"",U.arr+": "+(f.arrival||"?"),U.dep+": "+(f.departure||"?"),U.gst+": "+f.guests,U.nm+": "+(f.name||"")];if(f.message)l.push("",f.message);return l.join("\n")}
+function body(f){var l=[U.hello,"",U.arr+": "+(f.arrival||"?"),U.dep+": "+(f.departure||"?"),U.gst+": "+f.guests,U.nm+": "+(f.name||"")];if(f.phone)l.push((U.tel||"Tel")+": "+f.phone);if(f.message)l.push("",f.message);return l.join("\n")}
 function links(f){f=f||{guests:2};var t=body(f);
  var w=$("#cw"),m=$("#cm"),c=$("#cc");
  if(w){if(phone){w.href="https://wa.me/"+phone+"?text="+encodeURIComponent(t);w.hidden=false}else w.hidden=true}
@@ -178,21 +178,43 @@ function nights(){if(!d1.value||!d2.value)return 0;return Math.round((new Date(d
 function upd(){if(d1.value){var n=new Date(d1.value);n.setDate(n.getDate()+1);d2.min=n.toISOString().slice(0,10)}
  var n=nights();nn.textContent=n>0?n+" "+(n===1?U.n1:U.nN):U.pick}
 d1.addEventListener("change",function(){if(d2.value&&d2.value<=d1.value)d2.value="";upd()});d2.addEventListener("change",upd);upd();
-function data(){var g=function(i){return document.getElementById(i).value.trim()};
- return {lang:PX.lang,arrival:d1.value,departure:d2.value,guests:g("gg"),name:g("nm"),email:g("em"),phone:g("tl"),message:g("ms"),website:g("hp")}}
-form.addEventListener("input",function(){links(data())});
+function data(){var g=function(i){var el=document.getElementById(i);return el?el.value.trim():""};
+ return {lang:PX.lang,arrival:d1.value,departure:d2.value,guests:g("gg"),name:g("nm"),phone:g("tl"),website:g("hp")}}
+form.addEventListener("input",function(){links(data());sum()});
+form.addEventListener("change",sum);
+/* riepilogo e pagamento con carta (Stripe) */
+var bk=$("#bk"),bkt=$("#bkt"),sbc=$("#sbc"),bkor=$("#bkor"),bkn=$("#bkn"),CFG=null,via="wa";
+var eur=function(v){return new Intl.NumberFormat(PX.lang,{style:"currency",currency:"EUR",maximumFractionDigits:v%1?2:0}).format(v)};
+function sum(){if(!CFG||!bkt)return;var n=nights(),g=+(document.getElementById("gg")||{}).value||2;
+ if(n<1){bkt.hidden=true;return}
+ var tot=n*CFG.notte+CFG.pulizie;
+ bkt.innerHTML='<p class="bk-h">'+U.bkT+'</p><div class="bk-r"><span>'+n+' '+(n===1?U.n1:U.nN)+' × '+eur(CFG.notte)+'</span><span>'+eur(n*CFG.notte)+'</span></div>'+
+  (CFG.pulizie?'<div class="bk-r"><span>'+U.cln+'</span><span>'+eur(CFG.pulizie)+'</span></div>':'')+
+  '<svg class="bk-wv" viewBox="0 0 120 8" preserveAspectRatio="none" aria-hidden="true"><path d="M0 4q7.5-4 15 0t15 0 15 0 15 0 15 0 15 0 15 0 15 0"/></svg>'+
+  '<div class="bk-r bk-tot"><span>'+U.tot+'</span><b>'+eur(tot)+'</b></div>';
+ bkt.hidden=false}
+fetch("/api/pay-status",{cache:"no-store"}).then(function(r){return r.ok?r.json():null}).then(function(d){if(!d||!d.card)return;CFG=d;
+ sbc.hidden=false;bkor.hidden=false;bk.classList.add("on");bkn.textContent=U.note;sum()}).catch(function(){});
+[sbc,btn].forEach(function(b){if(b)b.addEventListener("click",function(){via=b.dataset.via})});
 form.addEventListener("submit",function(e){e.preventDefault();var f=data();msg.className="msg";msg.textContent="";
- if(!f.name||!/^\S+@\S+\.\S+$/.test(f.email)){msg.className="msg bad";msg.textContent=U.errReq;return}
- if(!$(".chk input",form).checked){msg.className="msg bad";msg.textContent=U.errConsent;return}
+ if(e.submitter&&e.submitter.dataset.via)via=e.submitter.dataset.via;
+ if(f.website)return;
+ if(!f.name||f.phone.replace(/\D/g,"").length<6){msg.className="msg bad";msg.textContent=U.errReq;return}
  if(f.arrival&&f.departure&&f.departure<=f.arrival){msg.className="msg bad";msg.textContent=U.errDates;return}
- if(!PX.api){ // senza servizio collegato non dichiariamo "inviata": apriamo WhatsApp/email già compilati
-  links(f);var t=phone?$("#cw"):email?$("#cm"):null;if(t){track("generate_lead",{method:t.id==="cw"?"whatsapp":"email"});location.href=t.href}else{msg.className="msg bad";msg.textContent=U.err}return}
- btn.disabled=true;btn.textContent=U.sending;
- fetch(PX.api,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(f)})
-  .then(function(r){if(!r.ok)throw new Error(r.status);return r.json()})
-  .then(function(){done.classList.add("on");form.reset();upd();track("generate_lead",{method:"form"})})
-  .catch(function(){msg.className="msg bad";msg.textContent=U.err;links(f)})
-  .then(function(){btn.disabled=false;btn.textContent=U.send})});
+ if(!$(".chk input",form).checked){msg.className="msg bad";msg.textContent=U.errConsent;return}
+ if(via==="card"&&CFG){
+  if(!(nights()>0)){msg.className="msg bad";msg.textContent=U.errNoDates;return}
+  sbc.disabled=true;var lb=sbc.querySelector("span"),old=lb.textContent;lb.textContent=U.paying;bk.classList.add("go");
+  track("begin_checkout",{value:nights()*CFG.notte+CFG.pulizie,currency:"EUR"});
+  fetch("/api/prenota",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(f)})
+   .then(function(r){return r.json().then(function(j){if(!r.ok||!j.url)throw new Error(j.error||r.status);return j})})
+   .then(function(j){location.href=j.url})
+   .catch(function(){msg.className="msg bad";msg.textContent=U.payErr;sbc.disabled=false;lb.textContent=old;bk.classList.remove("go")});
+  return}
+ links(f);var t=phone?$("#cw"):null;if(t){track("generate_lead",{method:"whatsapp"});location.href=t.href}else{msg.className="msg bad";msg.textContent=U.err}});
+/* ritorno da Stripe */
+var Q=new URLSearchParams(location.search);if(Q.get("prenotato")==="ok"&&done){done.classList.add("on");track("purchase",{method:"card"});
+ try{history.replaceState(null,"",location.pathname+"#contatti")}catch(e){}}
 })();
 
 /* ---------- a tema lago: calendario a onde, ospiti, increspature, riflessi ---------- */
@@ -778,6 +800,6 @@ function show(){C.hidden=false}
 if(st==="ok"){show();C.querySelector(".pc-ok").hidden=false;C.querySelector(".pc-f").hidden=true}
 else if(st==="errore"){show();C.querySelector(".pc-err").hidden=false}
 var a=q.get("paga"),r=q.get("rif");if(a)C.querySelector("[name=amount]").value=a;if(r)C.querySelector("[name=ref]").value=r;
-fetch("/api/pay-status",{cache:"no-store"}).then(function(x){return x.ok?x.json():{}}).then(function(d){if(d&&d.card){show();if(location.hash==="#carta")C.scrollIntoView({block:"start"})}}).catch(function(){});
+if(a||r)fetch("/api/pay-status",{cache:"no-store"}).then(function(x){return x.ok?x.json():{}}).then(function(d){if(d&&d.card){show();if(location.hash==="#carta")C.scrollIntoView({block:"start"})}}).catch(function(){});
 C.querySelector(".pc-f").addEventListener("submit",function(){var b=this.querySelector("button");setTimeout(function(){b.disabled=true},0);try{(window.dataLayer=window.dataLayer||[]).push({event:"card_checkout"})}catch(e){}});
 })();

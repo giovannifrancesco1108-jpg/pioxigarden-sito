@@ -7,3 +7,4 @@ wrangler.toml
 .assetsignore
 node_modules
 *.md
+lib

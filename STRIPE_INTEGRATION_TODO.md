@@ -8,6 +8,15 @@ Dopo il pagamento l'ospite torna su `/<lingua>/?pagamento=ok#carta`; se annulla,
 
 Il sito gira come **Cloudflare Worker** (`wrangler.jsonc`, `worker/index.js`): serve i file statici e instrada `/api/*` alle funzioni in `functions/api/`. `www` e gli altri due domini rimandano con 301 a pioxigarden.com.
 
+
+## Prenotazione con pagamento (modulo #contatti)
+Nel modulo "Richiedi disponibilità" l'ospite sceglie date e ospiti, scrive nome e telefono (niente email: la chiede Stripe per la ricevuta) e sceglie:
+- **Paga ora con carta** → `POST /api/prenota`: il server calcola notti × prezzo (+ pulizie) e crea la sessione Stripe. Compare solo se `STRIPE_SECRET_KEY` è impostata.
+- **Invia su WhatsApp** → apre WhatsApp con il messaggio già compilato.
+
+Prezzi modificabili senza codice (Worker → Impostazioni → Variabili e segreti, tipo Testo): `PREZZO_NOTTE` (predefinito 75), `PULIZIE` (predefinito 0), `NOTTI_MIN` (predefinito 1). Massimo 30 notti e 4 ospiti.
+Le date pagate vanno chiuse a mano su Booking/Airbnb: il sito non legge ancora i loro calendari.
+
 ## Setup
 
 ### Variabili d'ambiente (su Cloudflare, mai nel codice: il repository è pubblico)

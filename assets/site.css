@@ -811,3 +811,29 @@ main section.lk-in[id] .hd h2::after,#host.lk-in h2::after,#contatti.lk-in h2::a
 .pc-f .pc-n{font-size:14px}
 .pc-f .btn{justify-self:start;cursor:pointer;border:0}
 .pc-msg{margin-top:10px!important;font-weight:600;color:inherit!important}
+
+/* prenotazione: riepilogo "biglietto del battello" e due modi di pagare */
+.bk{display:grid;gap:14px}
+.bk-t{position:relative;border:1px dashed var(--line2);border-radius:16px;padding:16px 18px 14px;background:linear-gradient(180deg,rgba(240,193,120,.07),transparent 70%)}
+.bk-t::before,.bk-t::after{content:"";position:absolute;top:50%;width:16px;height:16px;margin-top:-8px;border-radius:50%;background:var(--panel);border:1px dashed var(--line2)}
+.bk-t::before{left:-9px;clip-path:inset(0 0 0 50%)}.bk-t::after{right:-9px;clip-path:inset(0 50% 0 0)}
+.bk-h{margin:0 0 8px;font:600 21px/1.2 var(--fd);color:var(--gold)}
+.bk-r{display:flex;justify-content:space-between;gap:12px;font-size:15px;color:var(--mute);font-variant-numeric:tabular-nums}
+.bk-wv{display:block;width:100%;height:8px;margin:10px 0 8px;fill:none;stroke:var(--gold);stroke-width:1.2;opacity:.55}
+.bk-tot{color:var(--fg);font-size:16px;align-items:baseline}.bk-tot b{font:600 30px/1 var(--fd);color:var(--fg)}
+.bk-t:not([hidden]){animation:bkIn .6s cubic-bezier(.2,.8,.2,1)}
+@keyframes bkIn{from{opacity:0;transform:translateY(8px)}}
+.bk-act{display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px}
+.bk-act .btn{gap:10px;flex:1 1 220px}
+.bk-act .btn svg{width:22px;height:22px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.bk-or{flex:0 0 auto;font-size:14px;color:var(--mute);font-style:italic}
+.bk.on .bk-wa{background:transparent;color:var(--fg);border:1px solid var(--line2);box-shadow:none}
+.bk.on .bk-wa:hover{background:rgba(255,255,255,.06)}
+.bk-card{background:var(--gold);color:#1d2b2c}
+.bk-card:hover{filter:brightness(1.05)}
+.bk.go .bk-card svg{animation:bkBob 1s ease-in-out infinite}
+@keyframes bkBob{50%{transform:translateY(-3px) rotate(-4deg)}}
+.bk-n{margin:0;font-size:14px;line-height:1.5;color:var(--mute)}
+.tel-l input{max-width:none}
+@media (max-width:560px){.bk-or{flex-basis:100%;text-align:center}.bk-act .btn{flex-basis:100%}}
+@media (prefers-reduced-motion:reduce){.bk-t:not([hidden]),.bk.go .bk-card svg{animation:none}}
