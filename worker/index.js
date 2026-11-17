@@ -1,6 +1,13 @@
-// Worker: serve il sito statico e instrada le API di pagamento (stesse funzioni di Pages in /functions).
+// Worker: serve il sito statico e instrada le API (le stesse funzioni di /functions usate da Pages).
 import * as checkout from "../functions/api/create-checkout-session.js";
 import * as webhook from "../functions/api/webhook.js";
+import * as payStatus from "../functions/api/pay-status.js";
+
+const ROUTES = {
+  "/api/create-checkout-session": { POST: checkout.onRequestPost },
+  "/api/webhook": { POST: webhook.onRequestPost },
+  "/api/pay-status": { GET: payStatus.onRequestGet },
+};
 
 export default {
   async fetch(request, env, ctx) {
@@ -12,14 +19,11 @@ export default {
     if (h !== PRIMARY && !h.endsWith(".workers.dev") && h !== "localhost" && !pathname.startsWith("/api/")) {
       return Response.redirect("https://" + PRIMARY + pathname + url.search, 301);
     }
-    const routes = {
-      "/api/create-checkout-session": checkout,
-      "/api/webhook": webhook,
-    };
-    const mod = routes[pathname];
-    if (mod) {
-      if (request.method !== "POST") return new Response("Method Not Allowed", { status: 405, headers: { Allow: "POST" } });
-      return mod.onRequestPost({ request, env, ctx });
+    const route = ROUTES[pathname];
+    if (route) {
+      const fn = route[request.method];
+      if (!fn) return new Response("Method Not Allowed", { status: 405, headers: { Allow: Object.keys(route).join(", ") } });
+      return fn({ request, env, ctx });
     }
     return env.ASSETS.fetch(request);
   },

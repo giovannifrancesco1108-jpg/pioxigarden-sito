@@ -771,3 +771,13 @@ document.querySelectorAll(".ota").forEach(function(o){
  st.addEventListener("click",function(e){e.preventDefault();x.hidden=true;var f=document.getElementById("d1");if(f){f.scrollIntoView({block:"center",behavior:"smooth"});setTimeout(function(){f.focus()},500)}});
 });
 })();
+
+/* pagamento con carta: visibile solo se Stripe è configurato */
+(function(){var C=document.getElementById("carta");if(!C)return;var q=new URLSearchParams(location.search),st=q.get("pagamento");
+function show(){C.hidden=false}
+if(st==="ok"){show();C.querySelector(".pc-ok").hidden=false;C.querySelector(".pc-f").hidden=true}
+else if(st==="errore"){show();C.querySelector(".pc-err").hidden=false}
+var a=q.get("paga"),r=q.get("rif");if(a)C.querySelector("[name=amount]").value=a;if(r)C.querySelector("[name=ref]").value=r;
+fetch("/api/pay-status",{cache:"no-store"}).then(function(x){return x.ok?x.json():{}}).then(function(d){if(d&&d.card){show();if(location.hash==="#carta")C.scrollIntoView({block:"start"})}}).catch(function(){});
+C.querySelector(".pc-f").addEventListener("submit",function(){var b=this.querySelector("button");setTimeout(function(){b.disabled=true},0);try{(window.dataLayer=window.dataLayer||[]).push({event:"card_checkout"})}catch(e){}});
+})();
