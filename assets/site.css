@@ -1002,3 +1002,10 @@ html.bks-on,html.bks-on body{overflow:hidden}
 .bks .form:has(.done.on)>:not(.done){display:none}
 .bks .done.on{position:relative;inset:auto;min-height:62vh;background:none;clip-path:none;padding:24px 4px}
 .bks-bd:focus{outline:none}
+.ck .ck-o{border:0;margin:0;padding:0;min-width:0;display:grid;gap:10px}
+.ck .ck-o label{display:flex;gap:10px;align-items:flex-start;font-size:15px;line-height:1.4;cursor:pointer}
+.ck .ck-o input{width:20px;height:20px;margin:1px 0 0;flex:none;accent-color:var(--acc)}
+.ck div{flex-wrap:wrap}
+html:not(.ck-on) .ckx{display:none}
+.ck-on .ckx{display:inline;padding-block:0}
+.ck{background:rgba(9,40,48,.97);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);z-index:70;box-shadow:0 18px 50px -12px rgba(0,0,0,.55)}

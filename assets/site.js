@@ -1,5 +1,5 @@
-/* misurazione delle conversioni (Google Analytics 4 / Google Ads via Tag Manager): eventi nel dataLayer, nessun ID qui */
-function track(ev,p){try{window.dataLayer=window.dataLayer||[];var o={event:ev};for(var k in p)o[k]=p[k];window.dataLayer.push(o)}catch(e){}}
+/* misurazione delle conversioni: eventi nel dataLayer (per Tag Manager) e, con il consenso, conversioni Google Ads (vedi «consenso ai cookie»); nessun ID qui */
+function track(ev,p){try{window.dataLayer=window.dataLayer||[];var o={event:ev};for(var k in p)o[k]=p[k];window.dataLayer.push(o)}catch(e){}try{if(window.PXconv)window.PXconv(ev,p)}catch(e){}}
 document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[href]");if(!a)return;var h=a.getAttribute("href")||"";
  if(h.indexOf("tel:")===0)track("contact",{method:"phone"});else if(/wa\.me|whatsapp/.test(h))track("contact",{method:"whatsapp"});else if(/#contatti$/.test(h))track("begin_checkout",{source:a.id||a.className})},true);
 (function(){
@@ -267,7 +267,7 @@ form.addEventListener("submit",function(e){e.preventDefault();var f=data();msg.c
    .then(function(j){location.href=j.url})
    .catch(function(er){bad(U.payErr+(document.documentElement.classList.contains("px-admin")&&er&&er.detail?" [Stripe: "+er.detail+"]":""));try{console.warn("Stripe:",er&&er.detail)}catch(x){}sbc.disabled=false;bk.classList.remove("go");sbcL.textContent=sbcT;sum()});
   return}
- links(f);var t=phone?$("#cw"):null;if(t){track("generate_lead",{method:"whatsapp"});location.href=t.href}else bad(U.err)});
+ links(f);var t=phone?$("#cw"):null;if(t){track("generate_lead",{method:"whatsapp"});if(window.PXgo)window.PXgo(t.href);else location.href=t.href}else bad(U.err)});
 /* ritorno da Stripe: il server verifica il pagamento e restituisce solo date, ospiti e importo */
 var Q=new URLSearchParams(location.search);
 if(Q.get("prenotato")==="ok"&&done){done.classList.add("on");var sid=Q.get("session_id")||"";
@@ -428,26 +428,91 @@ if(lb){document.getElementById("lbx").onclick=function(){lb.close()};document.ge
  var ex=document.getElementById("exg");if(ex){ex.addEventListener("click",function(e){var b=e.target.closest(".ex-b");if(!b||!lb.showModal||document.documentElement.classList.contains("edmode"))return;set=[].slice.call(ex.querySelectorAll("figure"));show(+b.dataset.i);lb.showModal();document.getElementById("lbx").focus({preventScroll:true})})}}
 })();
 
-/* ---------- consenso ai cookie: Tag Manager e Microsoft Clarity (mappe di calore) solo dopo "Accetto" ----------
-   gli ID si impostano da /admin → Statistiche; arrivano con /api/data e qui partono con PXtrackers() */
+/* ---------- consenso ai cookie: statistiche (Tag Manager, Clarity) e misurazione degli annunci (Google Ads), ognuna solo dopo il suo «sì» ----------
+   gli ID si impostano da /admin → Statistiche; arrivano con /api/data e qui partono con PXtrackers().
+   Consent Mode v2: Google riceve sempre lo stato del consenso, che parte da «negato»; la pubblicità personalizzata resta sempre negata.
+   Le scelte restano in questo browser: pxc2 = "s1a0" (statistiche sì, annunci no; "-" = non ancora chiesto).
+   Conversioni Google Ads: prenotazione pagata (purchase, verificata dal server) e contatto (richiesta o tocco su WhatsApp/telefono). */
 (function(){
 "use strict";
-var PX=window.PX||{},E=PX.ed||{},shown=false;
-document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("[data-ota]");if(a){try{window.dataLayer=window.dataLayer||[];window.dataLayer.push({event:"ota_click",platform:a.dataset.ota})}catch(x){}}},true);
-function load(){
- if(PX.gtm&&!window.__gtm){window.__gtm=1;window.dataLayer=window.dataLayer||[];window.dataLayer.push({"gtm.start":Date.now(),event:"gtm.js"});
-  var s=document.createElement("script");s.async=true;s.src="https://www.googletagmanager.com/gtm.js?id="+encodeURIComponent(PX.gtm);document.head.appendChild(s)}
- if(PX.clarity&&!window.__clr){window.__clr=1;(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+encodeURIComponent(i);y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y)})(window,document,"clarity","script",PX.clarity);
-  try{window.clarity("consent")}catch(x){}}}
-function start(){if(!PX.gtm&&!PX.clarity)return;if(document.documentElement.classList.contains("px-admin"))return;
- var v=null;try{v=localStorage.getItem("pxc")}catch(x){}
- if(v==="1"){load();return}if(v==="0"||shown)return;shown=true;
- var b=document.createElement("div");b.className="ck";b.setAttribute("role","dialog");b.setAttribute("aria-label",E.more||"Privacy");
- b.innerHTML='<p></p><div><button type="button" class="btn g s" data-c="0"></button><button type="button" class="btn s" data-c="1"></button></div>';
- b.querySelector("p").textContent=E.cookie||"";b.querySelector('[data-c="0"]').textContent=E.no||"No";b.querySelector('[data-c="1"]').textContent=E.ok||"OK";
- b.addEventListener("click",function(e){var c=e.target.closest("[data-c]");if(!c)return;try{localStorage.setItem("pxc",c.dataset.c)}catch(x){}if(c.dataset.c==="1")load();b.remove()});
- document.body.appendChild(b)}
-window.PXtrackers=function(o){o=o||{};if(o.gtm&&/^GTM-[A-Z0-9]{4,12}$/.test(o.gtm))PX.gtm=o.gtm;if(o.clarity&&/^[a-z0-9]{6,20}$/.test(o.clarity))PX.clarity=o.clarity;start()};
+var PX=window.PX||{},E=PX.ed||{},W=window,D=document,shown=null,def=false,Q=[],C={s:null,a:null},on={};
+W.dataLayer=W.dataLayer||[];
+function gtag(){W.dataLayer.push(arguments)}
+var T={it:{both:"Con il tuo consenso usiamo cookie di analisi, per migliorare il sito, e di misurazione, per sapere quali annunci Google portano prenotazioni. Puoi sceglierli separatamente. Nessuna pubblicità personalizzata.",
+  ads:"Con il tuo consenso usiamo cookie di misurazione, per sapere quali annunci Google portano prenotazioni. Nessuna pubblicità personalizzata.",
+  ch:"Scegli",sv:"Salva le scelte",s:"Statistiche delle visite",a:"Misurazione degli annunci (Google Ads)"},
+ en:{both:"With your consent we use analytics cookies, to improve the site, and measurement cookies, to see which Google ads lead to bookings. You can choose them separately. No personalised advertising.",
+  ads:"With your consent we use measurement cookies, to see which Google ads lead to bookings. No personalised advertising.",
+  ch:"Choose",sv:"Save choices",s:"Visit statistics",a:"Ad measurement (Google Ads)"},
+ fr:{both:"Avec votre accord, nous utilisons des cookies d’analyse, pour améliorer le site, et de mesure, pour savoir quelles annonces Google mènent à des réservations. Vous pouvez les choisir séparément. Aucune publicité personnalisée.",
+  ads:"Avec votre accord, nous utilisons des cookies de mesure, pour savoir quelles annonces Google mènent à des réservations. Aucune publicité personnalisée.",
+  ch:"Choisir",sv:"Enregistrer mes choix",s:"Statistiques de visite",a:"Mesure des annonces (Google Ads)"},
+ de:{both:"Mit Ihrer Zustimmung verwenden wir Analyse-Cookies, um die Website zu verbessern, und Mess-Cookies, um zu sehen, welche Google-Anzeigen zu Buchungen führen. Sie können beides getrennt wählen. Keine personalisierte Werbung.",
+  ads:"Mit Ihrer Zustimmung verwenden wir Mess-Cookies, um zu sehen, welche Google-Anzeigen zu Buchungen führen. Keine personalisierte Werbung.",
+  ch:"Auswählen",sv:"Auswahl speichern",s:"Besuchsstatistiken",a:"Anzeigenmessung (Google Ads)"},
+ es:{both:"Con tu consentimiento usamos cookies de análisis, para mejorar la web, y de medición, para saber qué anuncios de Google traen reservas. Puedes elegirlas por separado. Sin publicidad personalizada.",
+  ads:"Con tu consentimiento usamos cookies de medición, para saber qué anuncios de Google traen reservas. Sin publicidad personalizada.",
+  ch:"Elegir",sv:"Guardar mi elección",s:"Estadísticas de visitas",a:"Medición de anuncios (Google Ads)"}}[PX.lang]||null;
+D.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("[data-ota]");if(a){try{W.dataLayer.push({event:"ota_click",platform:a.dataset.ota})}catch(x){}}},true);
+function hasS(){return !!(PX.gtm||PX.clarity)}
+function hasA(){return !!(PX.aw&&(PX.awBuy||PX.awLead))}
+function read(){var v=null,o=null;try{v=localStorage.getItem("pxc2");o=localStorage.getItem("pxc")}catch(x){}
+ if(v&&/^s[01-]a[01-]$/.test(v)){C.s=v[1]==="-"?null:v[1]==="1";C.a=v[3]==="-"?null:v[3]==="1"}
+ else if(o==="1")C.s=true;else if(o==="0"){C.s=false;C.a=false}}
+function save(){var f=function(x){return x==null?"-":x?"1":"0"};try{localStorage.setItem("pxc2","s"+f(C.s)+"a"+f(C.a));localStorage.removeItem("pxc")}catch(x){}}
+function signal(){gtag("consent","update",{analytics_storage:C.s?"granted":"denied",ad_storage:C.a?"granted":"denied",ad_user_data:C.a?"granted":"denied",ad_personalization:"denied"})}
+function script(src){var s=D.createElement("script");s.async=true;s.src=src;D.head.appendChild(s)}
+function load(){signal();
+ if(C.s&&PX.gtm&&!on.gtm){on.gtm=1;W.dataLayer.push({"gtm.start":Date.now(),event:"gtm.js"});script("https://www.googletagmanager.com/gtm.js?id="+encodeURIComponent(PX.gtm))}
+ if(C.s&&PX.clarity&&!on.clr){on.clr=1;(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+encodeURIComponent(i);y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y)})(W,D,"clarity","script",PX.clarity);
+  try{W.clarity("consent")}catch(x){}}
+ if(C.a&&hasA()&&!on.aw){on.aw=1;script("https://www.googletagmanager.com/gtag/js?id="+encodeURIComponent(PX.aw));gtag("js",new Date());gtag("config",PX.aw,{allow_ad_personalization_signals:false})}
+ flush()}
+/* le conversioni aspettano gli ID e il consenso: partono solo se la misurazione degli annunci è accettata */
+function flush(){if(!(C.a&&on.aw))return;
+ while(Q.length){var q=Q.shift(),lab=q.k==="buy"?PX.awBuy:PX.awLead;if(!lab)continue;var o={send_to:PX.aw+"/"+lab};
+  if(q.k==="buy"){o.value=q.v;o.currency=q.c||"EUR";if(q.t)o.transaction_id=q.t}gtag("event","conversion",o)}}
+W.PXconv=function(ev,p){p=p||{};var k=ev==="purchase"?"buy":ev==="generate_lead"||(ev==="contact"&&/^(whatsapp|phone)$/.test(p.method||""))?"lead":null;
+ if(!k||Q.length>20)return;Q.push({k:k,v:+p.value||0,c:p.currency,t:p.transaction_id});flush()};
+/* se si toglie un consenso già dato: via i cookie di prima parte di Google e Clarity, poi la pagina si ricarica senza quegli script */
+function wipe(){var h=location.hostname,d=h.split(".").slice(-2).join(".");
+ D.cookie.split(";").forEach(function(c){var n=c.split("=")[0].trim();if(!/^(_ga|_gid|_gat|_gcl|_clck|_clsk)/.test(n))return;
+  ["",";domain="+h,";domain=."+d].forEach(function(x){D.cookie=n+"=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/"+x})})}
+function banner(edit){if(shown)return;var S=hasS(),A=hasA(),both=!!(S&&A&&T);
+ var b=D.createElement("div");b.className="ck";b.setAttribute("role","dialog");b.setAttribute("aria-label",E.more||"Privacy");shown=b;
+ b.innerHTML='<p></p>'+(both?'<fieldset class="ck-o"'+(edit?'':' hidden')+'><label><input type="checkbox" data-k="s"><span></span></label><label><input type="checkbox" data-k="a"><span></span></label></fieldset>':'')+
+  '<div><button type="button" class="btn g s" data-c="0"></button>'+(both?'<button type="button" class="btn g s" data-c="'+(edit?'v':'x')+'"></button>':'')+'<button type="button" class="btn s" data-c="1"></button></div>';
+ b.querySelector("p").textContent=both?T.both:A&&!S&&T?T.ads:E.cookie||"";
+ b.querySelector('[data-c="0"]').textContent=E.no||"No";b.querySelector('[data-c="1"]').textContent=E.ok||"OK";
+ var ks=b.querySelector('[data-k="s"]'),ka=b.querySelector('[data-k="a"]');
+ if(both){var nm=[PX.gtm&&"Google Analytics",PX.clarity&&"Microsoft Clarity"].filter(Boolean).join(", ");
+  ks.nextSibling.textContent=T.s+(nm?" ("+nm+")":"");ka.nextSibling.textContent=T.a;ks.checked=!!C.s;ka.checked=!!C.a;
+  b.querySelector('[data-c="'+(edit?'v':'x')+'"]').textContent=edit?T.sv:T.ch}
+ b.addEventListener("click",function(e){var c=e.target.closest("[data-c]");if(!c)return;var k=c.dataset.c,was={s:C.s,a:C.a};
+  if(k==="x"){b.querySelector(".ck-o").hidden=false;c.dataset.c="v";c.textContent=T.sv;ks.focus();return}
+  if(k==="1"){if(S)C.s=true;if(A)C.a=true}else if(k==="0"){if(S)C.s=false;if(A)C.a=false}else{if(S)C.s=ks.checked;if(A)C.a=ka.checked}
+  save();b.remove();shown=null;
+  if(was.s&&!C.s||was.a&&!C.a){wipe();signal();setTimeout(function(){location.reload()},60);return}
+  load()});
+ D.body.appendChild(b);place()}
+/* se è aperto un pannello a tutto schermo (prenotazione, foto, tour), il riquadro va dentro il pannello: fuori resterebbe dietro e non si potrebbe toccare */
+function place(){if(!shown)return;var m=null;[].forEach.call(D.querySelectorAll("dialog[open]"),function(d){try{if(d.matches(":modal"))m=d}catch(x){}});
+ var host=m||D.body;if(shown.parentNode!==host)host.appendChild(shown)}
+if(W.MutationObserver)new MutationObserver(function(){if(shown)place()}).observe(D.documentElement,{attributes:true,attributeFilter:["open"],subtree:true});
+/* invio su WhatsApp dal modulo: un attimo di attesa, così la conversione parte prima di lasciare la pagina */
+W.PXgo=function(u){if(C.a&&on.aw)setTimeout(function(){location.href=u},350);else location.href=u};
+function start(){if(!hasS()&&!hasA())return;if(D.documentElement.classList.contains("px-admin"))return;
+ D.documentElement.classList.add("ck-on");
+ if(!def){def=true;gtag("consent","default",{analytics_storage:"denied",ad_storage:"denied",ad_user_data:"denied",ad_personalization:"denied"});gtag("set","ads_data_redaction",true)}
+ read();if(C.s||C.a)load();
+ if(hasS()&&C.s==null||hasA()&&C.a==null)banner(false)}
+/* «Cambia le scelte sui cookie» nell'informativa: riapre il riquadro con le scelte attuali */
+D.addEventListener("click",function(e){var x=e.target.closest&&e.target.closest(".ckx");if(!x)return;e.preventDefault();var d=x.closest("dialog");if(d&&d.open)d.close();
+ if(shown){shown.remove();shown=null}read();banner(true)});
+W.PXtrackers=function(o){o=o||{};
+ if(o.gtm&&/^GTM-[A-Z0-9]{4,12}$/.test(o.gtm))PX.gtm=o.gtm;if(o.clarity&&/^[a-z0-9]{6,20}$/.test(o.clarity))PX.clarity=o.clarity;
+ if(o.aw&&/^AW-\d{6,12}$/.test(o.aw))PX.aw=o.aw;if(o.awBuy&&/^[\w-]{6,40}$/.test(o.awBuy))PX.awBuy=o.awBuy;if(o.awLead&&/^[\w-]{6,40}$/.test(o.awLead))PX.awLead=o.awLead;
+ start()};
 start();
 })();
 

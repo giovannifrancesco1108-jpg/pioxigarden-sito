@@ -118,7 +118,12 @@ input:focus,button:focus-visible,a:focus-visible{outline:2px solid var(--gold);o
  <label>Microsoft Clarity: ID del progetto<input type="text" id="sCl" autocapitalize="off" spellcheck="false" placeholder="es. k3x9abcd12"></label>
  <p class="hint">clarity.microsoft.com → Nuovo progetto (sito: pioxigarden.com) → Impostazioni → Panoramica → "ID progetto". Gratis, con mappe di calore e registrazioni anonime delle visite.</p>
  <label>Google Tag Manager: ID contenitore<input type="text" id="sGt" autocapitalize="characters" spellcheck="false" placeholder="GTM-XXXXXXX"></label>
- <p class="hint">Serve per Google Analytics e per misurare le campagne Google Ads e Meta.</p>
+ <p class="hint">Serve per Google Analytics e per le campagne Meta. Per Google Ads bastano i due campi qui sotto.</p>
+ <h2 style="font-size:21px;margin-top:6px">Google Ads: conversioni</h2>
+ <p class="hint">Google Ads → Obiettivi → Conversioni → apri l'azione → Configura il tag → "Installa il tag manualmente": copia il codice dopo <b>send_to</b> (AW-…/…). Puoi incollare anche tutto il blocco di codice: il codice lo trovo io.</p>
+ <label>Prenotazione pagata<input type="text" id="sAb" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="AW-123456789/AbCdEfGhIjK"></label>
+ <label>Contatto (richiesta o tocco su WhatsApp e telefono)<input type="text" id="sAl" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="AW-123456789/LmNoPqRsTuV"></label>
+ <p class="hint">Si attivano solo per chi accetta la misurazione degli annunci. Non creare le stesse conversioni anche in Tag Manager, o verranno contate due volte.</p>
  <div class="row"><button class="btn" type="button" id="saveS">Salva</button><p class="msg" id="mS" role="status"></p></div>
 </section>
 
@@ -168,9 +173,9 @@ $("saveP").onclick=function(){var r=read();if(!(+r.notte>0))return say($("mP"),"
 function fill(j){P=j;$("pN").value=j.notte;$("pW").value=j.weekend==null?"":j.weekend;$("pC").value=j.pulizie||0;$("pM").value=j.min||1;$("per").innerHTML="";(j.stagioni||[]).forEach(perRow);ex()}
 
 /* impostazioni */
-function fillI(j){I=j;$("sCl").value=j.clarity||"";$("sGt").value=j.gtm||"";$("iC").checked=j.carta!==false;$("iB").value=j.booking||"";$("iA").value=j.airbnb||"";$("iV").value=j.vrbo||""}
+function fillI(j){I=j;$("sCl").value=j.clarity||"";$("sGt").value=j.gtm||"";$("sAb").value=j.aw&&j.awBuy?j.aw+"/"+j.awBuy:"";$("sAl").value=j.aw&&j.awLead?j.aw+"/"+j.awLead:"";$("iC").checked=j.carta!==false;$("iB").value=j.booking||"";$("iA").value=j.airbnb||"";$("iV").value=j.vrbo||""}
 var I={};
-$("saveI").onclick=function(){var b={carta:$("iC").checked,booking:$("iB").value.trim(),airbnb:$("iA").value.trim(),vrbo:$("iV").value.trim(),gtm:I.gtm||"",clarity:I.clarity||""};
+$("saveI").onclick=function(){var b=Object.assign({},I,{carta:$("iC").checked,booking:$("iB").value.trim(),airbnb:$("iA").value.trim(),vrbo:$("iV").value.trim()});
  var bad=["booking","airbnb","vrbo"].filter(function(k){return b[k]&&!/^https:\/\/\S+$/.test(b[k])});if(bad.length)return say($("mI"),"I link devono iniziare con https://");
  $("saveI").disabled=true;api("PUT","impostazioni",b).then(function(j){fillI(j);say($("mI"),"Salvato.",true)}).catch(function(){say($("mI"),"Non salvato. Riprova.")}).then(function(){$("saveI").disabled=false})};
 $("iC").onchange=function(){$("saveI").click()};
@@ -182,11 +187,15 @@ $("saveK").onclick=function(){var k=$("sk").value.trim();if(!k)return say($("mK"
   .then(function(){$("saveK").disabled=false})};
 $("delK").onclick=function(){api("DELETE","stripe").then(function(){stripeOn(false);say($("mK"),"Chiave rimossa.",true)})};
 function stripeOn(on){var s=$("stp");s.classList.toggle("on",on);s.querySelector("span").textContent=on?"Stripe collegato":"Stripe non collegato";$("delK").hidden=!on}
-$("saveS").onclick=function(){var cl=$("sCl").value.trim().toLowerCase(),gt=$("sGt").value.trim().toUpperCase();
+function awp(v){var m=String(v||"").match(/AW-(\d{6,12})\/([\w-]{6,40})/i);return m?{id:"AW-"+m[1],l:m[2]}:null}
+$("saveS").onclick=function(){var cl=$("sCl").value.trim().toLowerCase(),gt=$("sGt").value.trim().toUpperCase(),ab=$("sAb").value.trim(),al=$("sAl").value.trim(),pb=awp(ab),pl=awp(al);
  if(cl&&!/^[a-z0-9]{6,20}$/.test(cl))return say($("mS"),"L'ID di Clarity è fatto solo di lettere e numeri (es. k3x9abcd12).");
  if(gt&&!/^GTM-[A-Z0-9]{4,12}$/.test(gt))return say($("mS"),"L'ID di Tag Manager inizia con GTM-");
- var b=Object.assign({},I,{clarity:cl,gtm:gt});$("saveS").disabled=true;
- api("PUT","impostazioni",b).then(function(j){fillI(j);say($("mS"),"Salvato. Le statistiche partono per chi accetta i cookie.",true)}).catch(function(){say($("mS"),"Non salvato. Riprova.")}).then(function(){$("saveS").disabled=false})};
+ if(ab&&!pb)return say($("mS"),"Prenotazione pagata: non trovo un codice AW-…/… in quello che hai incollato.");
+ if(al&&!pl)return say($("mS"),"Contatto: non trovo un codice AW-…/… in quello che hai incollato.");
+ if(pb&&pl&&pb.id!==pl.id)return say($("mS"),"I due codici vengono da account Google Ads diversi: controllali.");
+ var b=Object.assign({},I,{clarity:cl,gtm:gt,aw:(pb||pl||{}).id||"",awBuy:pb?pb.l:"",awLead:pl?pl.l:""});$("saveS").disabled=true;
+ api("PUT","impostazioni",b).then(function(j){fillI(j);say($("mS"),j.aw?"Salvato. Statistiche e conversioni partono per chi accetta i cookie.":"Salvato. Le statistiche partono per chi accetta i cookie.",true)}).catch(function(){say($("mS"),"Non salvato. Riprova.")}).then(function(){$("saveS").disabled=false})};
 $("savePw").onclick=function(){var a=$("o1").value,b=$("o2").value;if(b.length<8)return say($("mW"),"La nuova password deve avere almeno 8 caratteri.");
  api("POST","password",{old:a,password:b}).then(function(){$("o1").value=$("o2").value="";say($("mW"),"Password cambiata.",true)}).catch(function(e){say($("mW"),e.code==="bad"?"La password attuale è sbagliata.":"Non cambiata. Riprova.")})};
 
