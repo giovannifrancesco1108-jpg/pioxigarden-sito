@@ -1,5 +1,5 @@
 // API della pagina /admin/alloggiati/ (solo dopo l'accesso al pannello).
-import { credenziali, aiKey, provaAccesso, generaToken, tabella, controllaRighe, schedine, ricevuta, leggiDocumento, provaChiaveAI, AwError } from "../lib/alloggiati.js";
+import { credenziali, aiKey, provaAccesso, generaToken, tabella, controllaRighe, idAppartamenti, schedine, ricevuta, leggiDocumento, provaChiaveAI, AwError } from "../lib/alloggiati.js";
 
 const J = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
 const oggi = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome" }).format(new Date());
@@ -95,7 +95,14 @@ export async function alloggiati(req, env, p, m) {
       const b = await req.json().catch(() => ({}));
       const bad = controllaRighe(b.righe);
       if (bad) return J({ error: "schedine", detail: bad }, 400);
-      const r = await schedine(c, b.righe, p === "invia" ? "Send" : "Test");
+      // pagina del telefono con la versione vecchia: se l'ID appartamento è 0 o vuoto e ce n'è uno solo, lo prendo dalla tabella salvata
+      let righe = b.righe;
+      if (righe[0].length === 174 && !(parseInt(righe[0].slice(168), 10) > 0)) {
+        const ids = idAppartamenti(await env.PX.get("aw_tab_app"));
+        if (ids.length !== 1) return J({ error: "schedine", detail: ids.length ? "Hai più appartamenti: scegli quale nel menu." : "Nessun appartamento nella tabella: premi «aggiorna tabelle»." }, 400);
+        righe = righe.map((r) => r.slice(0, 168) + String(ids[0]).padEnd(6, " "));
+      }
+      const r = await schedine(c, righe, p === "invia" ? "Send" : "Test");
       if (p === "invia") await registra(env, { ts: Date.now(), arrivo: ISO.test(b.arrivo || "") ? b.arrivo : "", n: r.totali, valide: r.valide });
       return J(r);
     }
