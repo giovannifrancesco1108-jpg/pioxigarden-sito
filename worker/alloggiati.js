@@ -1,5 +1,5 @@
 // API della pagina /admin/alloggiati/ (solo dopo l'accesso al pannello).
-import { credenziali, aiKey, provaAccesso, generaToken, tabella, controllaRighe, idAppartamenti, schedine, ricevuta, leggiDocumento, provaChiaveAI, AwError } from "../lib/alloggiati.js";
+import { credenziali, aiKey, provaAccesso, generaToken, tabella, controllaRighe, controllaSchedine, idAppartamenti, schedine, ricevuta, leggiDocumento, provaChiaveAI, AwError } from "../lib/alloggiati.js";
 
 const J = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
 const oggi = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome" }).format(new Date());
@@ -89,6 +89,16 @@ export async function alloggiati(req, env, p, m) {
       await env.PX.put(ck, String(n + 1), { expirationTtl: 2 * 86400 });
       return J(await leggiDocumento(key, im));
     }
+    if (p === "leggi_testo" && m === "POST") {
+      const key = await aiKey(env);
+      if (!key) return J({ error: "ai_mancante" }, 409);
+      const b = await req.json().catch(() => ({}));
+      if (typeof b.testo !== "string" || !b.testo.trim() || b.testo.length > 8000) return J({ error: "testo" }, 400);
+      const ck = "aw_ai:" + oggi(), n = +(await env.PX.get(ck)) || 0;
+      if (n >= 120) return J({ error: "limite" }, 429);
+      await env.PX.put(ck, String(n + 1), { expirationTtl: 2 * 86400 });
+      return J(await leggiDocumento(key, [], b.testo));
+    }
     if ((p === "verifica" || p === "invia") && m === "POST") {
       const c = await credenziali(env);
       if (!c) return J({ error: "non_collegato" }, 409);
@@ -107,6 +117,10 @@ export async function alloggiati(req, env, p, m) {
         if (ids.length !== 1) return J({ error: "schedine", detail: ids.length ? "Hai più appartamenti: scegli quale nel menu." : "Il portale non mostra nessun appartamento attivo: controllalo in Gestione Appartamenti sul portale." }, 400);
         righe = righe.map((r) => r.slice(0, 168) + String(ids[0]).padEnd(6, " "));
       }
+      // controllo rigoroso del tracciato e dei codici PRIMA di toccare il portale (niente va alla Questura se qualcosa non torna)
+      const [tl, td] = await Promise.all([env.PX.get("aw_tab_luoghi"), env.PX.get("aw_tab_doc")]);
+      const problemi = controllaSchedine(righe.map((r) => r.slice(0, 168)), { luoghi: tl, documenti: td });
+      if (problemi.length) return J({ error: "schedine", detail: problemi.slice(0, 4).join(" · ") + (problemi.length > 4 ? " · (+" + (problemi.length - 4) + ")" : "") }, 400);
       const r = await schedine(c, righe, p === "invia" ? "Send" : "Test");
       if (p === "invia") await registra(env, { ts: Date.now(), arrivo: ISO.test(b.arrivo || "") ? b.arrivo : "", n: r.totali, valide: r.valide });
       return J(r);
