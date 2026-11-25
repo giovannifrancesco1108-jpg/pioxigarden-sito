@@ -5,6 +5,7 @@ Pannello admin (`/admin/alloggiati/`) + worker Cloudflare che invia le schedine 
 ## Comandi di prova (da lanciare prima di ogni commit)
 - `node tests/alloggiati.test.js` – prove unitarie (lettura testo, MRZ, codice fiscale, controlli)
 - `node tests/server.test.mjs` – controlli lato server (168 caratteri, ID appartamento)
+- (scanner in `admin/alloggiati/scanner.js`, prove incluse in `tests/alloggiati.test.js`)
 - `node tests/corpus/run.js` – 185 documenti sintetici di 39 nazionalità, 150 incolla (singoli, coppie, terzetti). Deve dare 100%.
 - `node tests/corpus/run.js --duro --errori` – versione "sporca" (O/0, minuscole, righe spazzatura, documenti attaccati). Elenca i campi sbagliati: è la lista di cosa migliorare. Opzioni: `--tipo=`, `--min=`.
 

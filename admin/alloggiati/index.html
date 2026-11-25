@@ -85,7 +85,7 @@ details[open].card>summary::after{content:"▴"}
 </head>
 <body>
 <main>
-<header><h1>Alloggiati Web<small>Comunicazione degli ospiti alla Questura</small></h1><p style="margin:4px 0 0;font-weight:700;color:#0a7a3d">VERSIONE 7 · CONFERMA PRIMA DI INSERIRE</p><a class="btn g s" href="/admin/">← Pannello</a></header>
+<header><h1>Alloggiati Web<small>Comunicazione degli ospiti alla Questura</small></h1><p style="margin:4px 0 0;font-weight:700;color:#0a7a3d">VERSIONE 8 · SCANNER + LETTURA ANCHE DI DOCUMENTI ESTERI</p><a class="btn g s" href="/admin/">← Pannello</a></header>
 
 <section class="card" id="auth" hidden>
  <h2>Accedi</h2>
@@ -178,6 +178,7 @@ details[open].card>summary::after{content:"▴"}
 
 <script src="/admin/alloggiati/mrz.js"></script>
 <script src="/admin/alloggiati/controlli.js"></script>
+<script src="/admin/alloggiati/scanner.js"></script>
 <script src="/admin/alloggiati/incolla.js"></script>
 <script>
 (function(){
@@ -281,6 +282,19 @@ function tela(im,rot,M){var w=im.naturalWidth,h=im.naturalHeight,s=Math.min(1,M/
  c.width=r?H:W;c.height=r?W:H;var x=c.getContext("2d");x.translate(c.width/2,c.height/2);x.rotate(rot*Math.PI/180);x.drawImage(im,-W/2,-H/2,W,H);
  var d=x.getImageData(0,0,c.width,c.height),p=d.data,mn=255,mx=0,i,g;for(i=0;i<p.length;i+=4){g=(p[i]*.3+p[i+1]*.59+p[i+2]*.11)|0;p[i]=g;if(g<mn)mn=g;if(g>mx)mx=g}
  var k=255/Math.max(1,mx-mn);for(i=0;i<p.length;i+=4){g=(p[i]-mn)*k;p[i]=p[i+1]=p[i+2]=g}x.putImageData(d,0,0);return c}
+/* «cam scanner»: ritaglia il documento, lo raddrizza, toglie ombre e alza il contrasto, tutto sul telefono. Se qualcosa va storto resta la foto originale. */
+function scansiona(im){return new Promise(function(ok){try{
+ var nw=im.naturalWidth,nh=im.naturalHeight,L=Math.max(1600,Math.min(2400,Math.max(nw,nh))),s=L/Math.max(nw,nh);
+ function piccola(src,sw,sh){var k=Math.min(1,700/Math.max(sw,sh)),c=document.createElement("canvas");c.width=Math.max(8,Math.round(sw*k));c.height=Math.max(8,Math.round(sh*k));var x=c.getContext("2d",{willReadFrequently:true});x.drawImage(src,0,0,c.width,c.height);var d=x.getImageData(0,0,c.width,c.height);return{g:SCAN.grigio(d.data,c.width,c.height),w:c.width,h:c.height}}
+ var a=piccola(im,nw,nh),ang=SCAN.inclinazione(a.g,a.w,a.h),W=Math.round(nw*s),H=Math.round(nh*s),r=ang*Math.PI/180,
+  CW=Math.round(Math.abs(W*Math.cos(r))+Math.abs(H*Math.sin(r))),CH=Math.round(Math.abs(W*Math.sin(r))+Math.abs(H*Math.cos(r))),
+  c1=document.createElement("canvas");c1.width=CW;c1.height=CH;var x1=c1.getContext("2d");x1.fillStyle="#808080";x1.fillRect(0,0,CW,CH);
+ x1.translate(CW/2,CH/2);x1.rotate(-r);x1.drawImage(im,-W/2,-H/2,W,H);
+ var b=piccola(c1,CW,CH),bx=SCAN.ritaglio(b.g,b.w,b.h),k=CW/b.w,sx=Math.round(bx.x*k),sy=Math.round(bx.y*k),sw=Math.min(CW-sx,Math.round(bx.w*k)),sh=Math.min(CH-sy,Math.round(bx.h*k)),
+  c2=document.createElement("canvas");c2.width=sw;c2.height=sh;var x2=c2.getContext("2d",{willReadFrequently:true});x2.drawImage(c1,sx,sy,sw,sh,0,0,sw,sh);
+ var d=x2.getImageData(0,0,sw,sh),g=SCAN.normalizza(SCAN.grigio(d.data,sw,sh),sw,sh),i,j=0;for(i=0;i<d.data.length;i+=4){d.data[i]=d.data[i+1]=d.data[i+2]=g[j++]}x2.putImageData(d,0,0);
+ var out=new Image();out.onload=function(){ok(out)};out.onerror=function(){ok(null)};out.src=c2.toDataURL("image/jpeg",.92)
+}catch(e){ok(null)}})}
 function anteprima(im){var s=Math.min(1,900/Math.max(im.naturalWidth,im.naturalHeight)),c=document.createElement("canvas");c.width=Math.round(im.naturalWidth*s);c.height=Math.round(im.naturalHeight*s);c.getContext("2d").drawImage(im,0,0,c.width,c.height);return c.toDataURL("image/jpeg",.8)}
 function leggiMRZ(w,im){var giri=[0,90,270,180],i=0;
  function prova(){if(i>=giri.length)return Promise.resolve(null);var c=tela(im,giri[i++],2000);
@@ -293,7 +307,11 @@ function testoFoto(w,im){var giri=[0,90,270,180],i=0,best="";
   return w.recognize(c).then(function(r){var t=(r.data&&r.data.text)||"";if(INC.persone(t).length)return t;if(t.length>best.length)best=t;return prova()})}
  return w.setParameters({tessedit_char_whitelist:"",tessedit_pageseg_mode:"6"}).then(prova).catch(function(){return best})
   .then(function(t){return w.setParameters({tessedit_char_whitelist:WL,tessedit_pageseg_mode:"6"}).then(function(){return t},function(){return t})})}
-function leggiMRZeTesto(w,im){return leggiMRZ(w,im).then(function(r){return testoFoto(w,im).then(function(tx){if(tx)TESTI.push(tx);return r})})}
+function leggiMRZeTesto(w,im,orig){return leggiMRZ(w,im).then(function(r){return testoFoto(w,im).then(function(tx){
+  var buono=r||(tx&&INC.persone(tx).length);
+  if(buono||!orig)return{r:r,tx:tx};
+  // la scansione non ha dato niente: riprovo con la foto com'era
+  return leggiMRZ(w,orig).then(function(r2){return testoFoto(w,orig).then(function(tx2){return{r:r2,tx:(tx2&&tx2.length>(tx||"").length)?tx2:tx}})})}).then(function(o){if(o.tx)TESTI.push(o.tx);return o.r})})}
 function daMRZ(r,foto){var g=nuovo({cognome:r.cognome,nome:r.nome,sesso:r.sesso,data_nascita:r.nascita,numero_documento:r.numero});g.foto=foto;g.mrz=r;g.src={foto:1};
  var paese=function(c){return MRZ.PAESI[c]?trova(TAB.stati,MRZ.PAESI[c]):null},naz=paese(r.nazionalita),em=paese(r.emittente);
  if(naz){g.citt=naz.c;g.statoN=naz.c}else g.dubbi.cittadinanza=1;
@@ -309,9 +327,9 @@ $("foto").addEventListener("change",function(){var fs=[].slice.call(this.files||
  $("drop").style.pointerEvents="none";TESTI=[];var nuovi=[],senza=[],n=0,prima=!TESS;
  say($("mL"),prima?"Preparo il lettore (solo la prima volta, qualche secondo)…":"Leggo…",true);
  lettore().then(function(w){
-  return fs.reduce(function(pr,f){return pr.then(function(){n++;say($("mL"),"Leggo la foto "+n+" di "+fs.length+"…",true);
-   return immagine(f).then(function(x){var u=anteprima(x.im);return leggiMRZeTesto(w,x.im).then(function(r){URL.revokeObjectURL(x.u);
-    if(r){var g=daMRZ(r,senza.concat([u]));senza=[];nuovi.push(g)}else senza.push(u)})})})},Promise.resolve())})
+  return fs.reduce(function(pr,f){return pr.then(function(){n++;say($("mL"),"Scansiono e leggo la foto "+n+" di "+fs.length+"…",true);
+   return immagine(f).then(function(x){return scansiona(x.im).then(function(sc){var u=anteprima(sc||x.im);return leggiMRZeTesto(w,sc||x.im,sc?x.im:null).then(function(r){URL.revokeObjectURL(x.u);
+    if(r){var g=daMRZ(r,senza.concat([u]));senza=[];nuovi.push(g)}else senza.push(u)})})})})},Promise.resolve())})
  .then(function(){
   if(senza.length&&nuovi.length){nuovi[nuovi.length-1].foto=nuovi[nuovi.length-1].foto.concat(senza);senza=[]}
   var gt=INC.leggi(TESTI.join("\n\n")).persone.map(daTesto);TESTI_RAW=TESTI.join("\n\n");
