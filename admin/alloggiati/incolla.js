@@ -36,8 +36,10 @@ var ETICHETTE = [
   ["nome", "nome|name|given names?|first names?|forenames?|prenoms?|nombres?|vorname[n]?"],
   ["sesso", "sesso|sex|sexe|sexo|geschlecht|genere|gender"],
   ["citt", "cittadinanza|nazionalita|nationality|citizenship|nationalite|nacionalidad|staatsangehorigkeit"],
-  ["numero", "numero del documento|numero documento|n\\.? ?documento|document no\\.?|document number|passport no\\.?|passport number|passeport n|n[°o]\\.? del documento|numero|document n[°o]|dokumentnummer|n[uú]mero de documento|no\\.|n\\."],
-  ["rilascio", "luogo di rilascio|comune di rilascio|rilasciat[oa] da|rilasciat[oa] a|rilasciat[oa] dal|autorita|issuing authority|authority|place of issue|issued by|issued at|emesso da|emessa da|rilascio|delivre par|autoridad|ausstellende beh[oö]rde|stato di rilascio|issuing state|issuing country|country of issue"],
+  ["cf", "codice fiscale|fiscal code|tax code|c\\.? ?f\\.?"],
+  ["ignora", "statura|height|taille|altura|grosse|residenza|residence|resident|domicilio|stato civile|marital status|professione|occupation|capelli|occhi|segni particolari|scadenza|date of expiry|expiry|expires|valid until|valida fino al|gultig bis|emissione|date of issue|data di rilascio|data rilascio|issuing|date d emission|indirizzo|address|estremi atto|atto di nascita|firma|signature|genitori|parents"],
+  ["numero", "numero du document|numero de documento|numero de document|numero du titre|carta d'? ?identita'? ?n[°o.]?|carta di identita'? ?n[°o.]?|n[°o.] carta|numero del documento|numero documento|n\\.? ?documento|document no\\.?|document number|passport no\\.?|passport number|passeport n|n[°o]\\.? del documento|numero|document n[°o]|dokumentnummer|n[uú]mero de documento|no\\.|n\\."],
+  ["rilascio", "luogo di rilascio|comune di rilascio|municipality of|comune di|issued by|rilasciat[oa] da|rilasciat[oa] a|rilasciat[oa] dal|autorita|issuing authority|authority|place of issue|issued by|issued at|emesso da|emessa da|rilascio|delivre par|autoridad|ausstellende beh[oö]rde|stato di rilascio|issuing state|issuing country|country of issue"],
   ["tipodoc", "tipo di documento|tipo documento|document type|type of document|type de document"]
 ];
 var RE_ET = ETICHETTE.map(function (e) { return [e[0], new RegExp("(^|[^a-z0-9])(" + e[1] + ")(?![a-z0-9])", "gi")]; });
@@ -79,10 +81,38 @@ function luogoDa(v, r) {
 
 function tipoDocDa(testo) {
   var t = norm(testo).replace(/'/g, " ").replace(/\s+/g, " ");
-  if (/CARTA D IDENTITA ELETTRONICA|CARTA IDENTITA ELETTRONICA|ELECTRONIC IDENTITY CARD|CIE\b/.test(t)) return "IDELE";
-  if (/CARTA D IDENTITA|CARTA IDENTITA|IDENTITY CARD|CARTE NATIONALE D IDENTITE|DOCUMENTO NACIONAL DE IDENTIDAD|PERSONALAUSWEIS/.test(t)) return "IDENT";
+  if (/CARTA (?:D |DI )?IDENTITA ELETTRONICA|ELECTRONIC IDENTITY CARD|\bCIE\b/.test(t)) return "IDELE";
+  if (/CARTA (?:D |DI )?IDENTITA|IDENTITY CARD|CARTE NATIONALE D IDENTITE|DOCUMENTO NACIONAL DE IDENTIDAD|PERSONALAUSWEIS/.test(t)) return "IDENT";
   if (/PASSAPORTO|PASSPORT|PASSEPORT|PASAPORTE|REISEPASS/.test(t)) return "PASOR";
   if (/PATENTE|DRIVING LICEN|PERMIS DE CONDUIRE|FUHRERSCHEIN|LICENCIA DE CONDUCIR/.test(t)) return "PATEN";
+  return "";
+}
+
+/* numeri dei documenti con formato noto: nelle posizioni delle cifre una lettera simile (O, I, S, B…) è quasi certamente una cifra, e viceversa */
+var L2D = { O: "0", Q: "0", D: "0", I: "1", L: "1", Z: "2", S: "5", B: "8", G: "6", T: "7" }, D2L = { "0": "O", "1": "I", "2": "Z", "5": "S", "8": "B", "6": "G" };
+var FORMATI = ["LLDDDDDLL", "LLDDDDDDD", "LDDDDDDDL"];
+function correggiNumero(n, tipo) {
+  var s = String(n || "").toUpperCase().replace(/[^A-Z0-9]/g, ""), best = null, ord = tipo === "IDELE" ? FORMATI : tipo ? [FORMATI[1], FORMATI[2], FORMATI[0]] : FORMATI, ambiguo = false;
+  ord.forEach(function (f) {
+    if (f.length !== s.length) return;
+    var out = "", cambi = 0, ok = true;
+    for (var i = 0; i < s.length && ok; i++) {
+      var c = s.charAt(i);
+      if (f.charAt(i) === "D") { if (/\d/.test(c)) out += c; else if (L2D[c]) { out += L2D[c]; cambi++; } else ok = false; }
+      else { if (/[A-Z]/.test(c)) out += c; else if (D2L[c]) { out += D2L[c]; cambi++; } else ok = false; }
+    }
+    if (ok && best && cambi === best.cambi && out !== best.v && !tipo) ambiguo = true;
+    if (ok && (!best || cambi < best.cambi)) best = { v: out, cambi: cambi };
+  });
+  return best && !ambiguo ? { v: best.v, cambiato: best.cambi > 0 } : { v: s, cambiato: false };
+}
+function numeroSenzaEtichetta(t) {
+  var tok = sa(t).toUpperCase().match(/\b[A-Z0-9]{9}\b/g) || [];
+  for (var i = 0; i < tok.length; i++) {
+    if (!/[A-Z]/.test(tok[i]) || (tok[i].match(/\d/g) || []).length < 3) continue; // «EMISSIONE» diventerebbe EM15510NE: servono almeno 3 cifre vere
+    var c = correggiNumero(tok[i]);
+    if (c.cambiato || FORMATI.some(function (f) { return new RegExp("^" + f.replace(/L/g, "[A-Z]").replace(/D/g, "\\d") + "$").test(tok[i]); })) return tok[i];
+  }
   return "";
 }
 
@@ -97,7 +127,7 @@ function patente(t) {
 }
 
 function persone(testo) {
-  var t = String(testo || "").replace(/\r/g, ""), P = [], pat = patente(t);
+  var t = String(testo || "").replace(/\r/g, "").replace(/[ \t\u00a0]+/g, " ").replace(/ *\n */g, "\n"), P = [], pat = patente(t);
   if (pat) P.push(pat);
   var et = trovaEtichette(t), cur = {}, punti = [];
   for (var i = 0; i < et.length; i++) {
@@ -110,7 +140,7 @@ function persone(testo) {
   function chiudi() { if (Object.keys(cur).length) P.push(cur); cur = {}; }
   punti.forEach(function (p) {
     if (!p.v) return;
-    var k = p.k, nuovaPersona = (k === "cognome" && cur.cognome && cur.cognome !== p.v) || (k === "nome" && cur.nome && cur.nome !== p.v && !cur.cognome);
+    var k = p.k, nv = norm(p.v), nuovaPersona = (k === "cognome" && cur.cognome && cur.cognome !== nv) || (k === "nome" && cur.nome && cur.nome !== nv && !cur.cognome);
     if (nuovaPersona) chiudi();
     if (k === "cognome") cur.cognome = norm(p.v);
     else if (k === "nome") cur.nome = norm(p.v);
@@ -120,15 +150,62 @@ function persone(testo) {
     else if (k === "luogo") luogoDa(p.v, cur);
     else if (k === "statonasc") cur.stato_nascita = norm(p.v);
     else if (k === "citt") cur.cittadinanza = norm(p.v);
+    else if (k === "cf") { var c = String(p.v).toUpperCase().replace(/[^A-Z0-9]/g, ""); if (/^[A-Z0-9]{16}$/.test(c)) cur.codice_fiscale = c; }
     else if (k === "numero") cur.numero_documento = p.v.replace(/[\s.\-]+/g, "").toUpperCase();
     else if (k === "rilascio") cur.rilascio_testo = p.v;
     else if (k === "tipodoc") cur.tipo_documento = tipoDocDa(p.v) || cur.tipo_documento;
   });
   chiudi();
+  var nn = /nat[oa](?:\/a)?\s+il\s+([0-9A-Za-z\/.\- ]{6,14}?)\s+a\s+([A-Za-z' ]{2,40}?)\s*\(\s*([A-Za-z]{2})\s*\)/i.exec(sa(t)) ||
+    /nat[oa](?:\/a)?\s+il\s+([0-9A-Za-z\/.\- ]{6,14}?)\s+a\s+([A-Za-z' ]{2,40}?)\s*()(?:\n|$|\s{2,})/i.exec(sa(t));
+  if (nn && P.length) { var q = P[0]; if (!q.data_nascita && dataNorm(nn[1])) q.data_nascita = dataNorm(nn[1]); if (!q.comune_nascita && !q.luogo_nascita) { if (nn[3]) { q.comune_nascita = norm(nn[2]); q.provincia_nascita = nn[3].toUpperCase(); } else q.luogo_nascita = norm(nn[2]); } }
+  // numero del documento senza etichetta (formati italiani: CIE AA00000AA, cartacea/passaporto AA0000000)
+  if (P.length === 1 && !P[0].numero_documento) {
+    var nm = numeroSenzaEtichetta(t);
+    if (nm) { P[0].numero_documento = nm; if (P[0].rilascio_testo) P[0].rilascio_testo = P[0].rilascio_testo.replace(new RegExp(nm, "i"), "").trim(); }
+  }
+  // codice fiscale senza etichetta
+  var cfm = sa(t).toUpperCase().match(/\b[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]\b/g);
+  if (cfm && P.length === 1 && !P[0].codice_fiscale) P[0].codice_fiscale = cfm[0];
   // un cognome incollato da solo senza nome (es. "ROSSI MARIO" su una riga) non si indovina: si lascia vuoto
   var td = tipoDocDa(t);
   P.forEach(function (p) { if (!p.tipo_documento && td) p.tipo_documento = td; });
+  var italiano = /REPUBBLICA ITALIANA|COMUNE DI|QUESTURA|MINISTERO DELL INTERNO|PATENTE/.test(norm(t).replace(/'/g, " "));
+  P.forEach(function (p) {
+    p.pulizia = [];
+    var itP = italiano || /^ITA$|^ITALIAN/.test(norm(p.cittadinanza || ""));
+    if (itP && p.numero_documento && /^(IDELE|IDENT|PASOR)$/.test(p.tipo_documento || "")) {
+      var c = correggiNumero(p.numero_documento, p.tipo_documento);
+      if (c.cambiato) { p.pulizia.push("Ho corretto il numero del documento da «" + p.numero_documento + "» a «" + c.v + "» (lettere e cifre simili). Controlla con la foto."); p.numero_documento = c.v; p.numero_corretto = true; }
+    }
+  });
   return P.filter(function (p) { return p.cognome || p.nome || p.data_nascita || p.numero_documento; });
+}
+
+/* ---- codice fiscale: serve solo per controllare la lettura (nome, cognome, data di nascita, sesso) ---- */
+var CF_D = { 0: 1, 1: 0, 2: 5, 3: 7, 4: 9, 5: 13, 6: 15, 7: 17, 8: 19, 9: 21, A: 1, B: 0, C: 5, D: 7, E: 9, F: 13, G: 15, H: 17, I: 19, J: 21, K: 2, L: 4, M: 18, N: 20, O: 11, P: 3, Q: 6, R: 8, S: 12, T: 14, U: 16, V: 10, W: 22, X: 25, Y: 24, Z: 23 };
+var CF_MESE = "ABCDEHLMPRST";
+function cfValido(cf) {
+  if (!/^[A-Z]{6}\d{2}[ABCDEHLMPRST]\d{2}[A-Z]\d{3}[A-Z]$/.test(cf)) return false;
+  var somma = 0, i, c;
+  for (i = 0; i < 15; i++) { c = cf.charAt(i); somma += i % 2 === 0 ? CF_D[c] : /\d/.test(c) ? +c : c.charCodeAt(0) - 65; }
+  return String.fromCharCode(65 + somma % 26) === cf.charAt(15);
+}
+function cfLettere(s, nome) {
+  var l = norm(s).replace(/[^A-Z]/g, ""), cons = l.replace(/[AEIOU]/g, ""), voc = l.replace(/[^AEIOU]/g, "");
+  if (nome && cons.length >= 4) cons = cons.charAt(0) + cons.charAt(2) + cons.charAt(3);
+  return (cons + voc + "XXX").slice(0, 3);
+}
+function cfDati(cf) { var g = +cf.slice(9, 11), f = g > 40; return { giorno: f ? g - 40 : g, mese: CF_MESE.indexOf(cf.charAt(8)) + 1, anno2: cf.slice(6, 8), sesso: f ? "F" : "M" }; }
+function cfControlla(p, cf) {
+  var av = [], dub = [];
+  if (!cfValido(cf)) { av.push("Il codice fiscale non ha la cifra di controllo giusta: è stato letto male."); return { av: av, dub: dub }; }
+  var d = cfDati(cf);
+  if (p.cognome && cf.slice(0, 3) !== cfLettere(p.cognome, false)) { dub.push("cognome"); av.push("Il codice fiscale non corrisponde al cognome letto."); }
+  if (p.nome && cf.slice(3, 6) !== cfLettere(p.nome, true)) { dub.push("nome"); av.push("Il codice fiscale non corrisponde al nome letto."); }
+  if (p.sesso && p.sesso !== d.sesso) { dub.push("sesso"); av.push("Il sesso non coincide con quello del codice fiscale."); }
+  if (p.data_nascita) { var m = /^(\d\d)\/(\d\d)\/\d\d(\d\d)$/.exec(p.data_nascita); if (m && (+m[1] !== d.giorno || +m[2] !== d.mese || m[3] !== d.anno2)) { dub.push("data_nascita"); av.push("La data di nascita non coincide con quella del codice fiscale."); } }
+  return { av: av, dub: dub, sesso: d.sesso };
 }
 
 /* confronto tra due letture della stessa persona: elenco delle differenze */
@@ -150,33 +227,118 @@ function daMRZ(r) {
   return p;
 }
 
-/* Lettura completa. Ritorna { persone:[{...campi, fonti:["testo","mrz"], differenze:[], avvisi:[], dubbi:[]}], note } */
-function leggi(testo) {
-  var t = String(testo || ""), out = { persone: [], note: [] };
-  if (t.length > 20000) { out.note.push("Testo troppo lungo: incolla solo la parte del documento."); return out; }
-  var mrz = MRZ ? MRZ.leggi(t) : null, P = persone(t).map(function (p) { p.fonti = ["testo"]; return p; });
-  if (mrz) {
-    var m = daMRZ(mrz); m.fonti = ["mrz"];
-    var i = -1; P.forEach(function (p, j) { if (i < 0 && p.cognome && norm(p.cognome) === norm(m.cognome)) i = j; });
-    if (i < 0 && P.length === 1) i = 0;
+/* tutte le MRZ del testo (anche di più documenti incollati insieme) */
+function mrzTutte(t) {
+  if (!MRZ) return [];
+  var L = MRZ.righe(t), out = [], i = 0;
+  while (i < L.length) {
+    var r = MRZ.leggi(L.slice(i, i + 3).join("\n")) || (i + 1 < L.length ? MRZ.leggi(L.slice(i, i + 2).join("\n")) : null);
+    if (r) { out.push(r); i += r.formato === "TD1" ? 3 : 2; } else i++;
+  }
+  return out;
+}
+var compatta = function (x) { return norm(x).replace(/ /g, ""); };
+
+/* più documenti incollati di seguito, senza righe vuote: si taglia prima dell'intestazione del documento successivo */
+var RE_INTEST = /(REPUBBLICA ITALIANA|COMUNE DI [A-Z' ]{2,25}(?=\s*\n?\s*CARTA)|CARTA (?:D'? ?|DI )?IDENTITA|PASSAPORTO|PASSPORT\b|IDENTITY CARD|PATENTE DI GUIDA|PERSONALAUSWEIS|CARTE NATIONALE)/gi;
+function dividi(testo) {
+  var t = String(testo || "").replace(/\r/g, "").replace(/[ \t\u00a0]+/g, " ").replace(/ *\n */g, "\n"), z = sa(t), et = trovaEtichette(t), inizi = [], visti = {};
+  var cur = {}, ult = null;
+  et.forEach(function (e, i) { // primo etichetta di ogni persona: stessa regola di persone()
+    var v = valoreDi(t, e.f, i + 1 < et.length ? et[i + 1].i : t.length); if (!v) return;
+    var nuova = (e.k === "cognome" && cur.cognome && cur.cognome !== norm(v)) || (e.k === "nome" && cur.nome && cur.nome !== norm(v) && !cur.cognome);
+    if (nuova) { inizi.push(e.i); cur = {}; }
+    if (e.k === "cognome") cur.cognome = norm(v); if (e.k === "nome") cur.nome = norm(v);
+  });
+  var pg, rp = /PATENTE DI GUIDA/gi; while ((pg = rp.exec(z))) if (pg.index > 0) inizi.push(pg.index);
+  inizi = inizi.filter(function (x, i, a) { return a.indexOf(x) === i; }).sort(function (a, b) { return a - b; });
+  if (!inizi.length) return [t];
+  var marc = [], m; RE_INTEST.lastIndex = 0; while ((m = RE_INTEST.exec(z))) marc.push({ i: m.index, f: m.index + m[0].length });
+  var tagli = inizi.map(function (a, k) {
+    var prec = k ? inizi[k - 1] : 0, c = a, cand = marc.filter(function (x) { return x.i < a && x.i > prec; });
+    if (cand.length) { c = cand[cand.length - 1].i; for (var j = cand.length - 2; j >= 0; j--) if (c - cand[j].f < 40 && !/\d/.test(z.slice(cand[j].f, c))) c = cand[j].i; else break; }
+    return c;
+  });
+  var out = [], da = 0; tagli.forEach(function (c) { out.push(t.slice(da, c)); da = c; }); out.push(t.slice(da));
+  return out.map(function (x) { return x.trim(); }).filter(Boolean);
+}
+
+/* lettura di un solo blocco di testo = un documento (o più, se non ci sono righe vuote tra l'uno e l'altro) */
+function leggiBlocco(t) {
+  var seg = dividi(t); if (seg.length > 1) return seg.reduce(function (a, x) { return a.concat(leggiBlocco(x)); }, []);
+  var M = mrzTutte(t).map(function (r) { var m = daMRZ(r); m.fonti = ["mrz"]; return m; });
+  var P = persone(t).map(function (p) { p.fonti = ["testo"]; return p; }), usati = {};
+  M.forEach(function (m, mi) {
+    var i = -1;
+    P.forEach(function (p, j) { if (i < 0 && !usati[j] && !p.mrz && ((p.cognome && compatta(p.cognome) === compatta(m.cognome)) || (p.numero_documento && compatta(p.numero_documento) === compatta(m.numero_documento)))) i = j; });
+    if (i < 0 && M.length === 1 && P.length === 1 && !P[0].mrz) i = 0;
+    if (i < 0) { var libere = P.map(function (p, j) { return j; }).filter(function (j) { return !usati[j] && !P[j].mrz; }); if (M.length === P.length && libere.length === P.length - Object.keys(usati).length && libere[0] !== undefined && M.length - mi === libere.length) i = libere[0]; }
     if (i >= 0) {
-      var p = P[i], dif = confronta(p, m); p.differenze = dif; p.fonti = ["testo", "mrz"]; p.mrz = mrz;
+      usati[i] = 1;
+      var p = P[i], dif = confronta(p, m); p.differenze = dif; p.fonti = ["testo", "mrz"]; p.mrz = m.mrz;
       ["cognome", "nome", "sesso", "data_nascita", "numero_documento", "cittadinanza", "tipo_documento", "rilascio_stato"].forEach(function (k) { if (!p[k] && m[k]) p[k] = m[k]; });
       // se le due letture non coincidono vale la MRZ (ha le cifre di controllo) ma il campo resta da controllare
       dif.forEach(function (d) {
-        var k = { "cognome": "cognome", "nome": "nome", "data di nascita": "data_nascita", "sesso": "sesso", "numero del documento": "numero_documento" }[d];
-        if (k && mrz.controlli && (k !== "numero_documento" || mrz.controlli.numero) && (k !== "data_nascita" || mrz.controlli.nascita)) p[k] = m[k];
+        var k = { "cognome": "cognome", "nome": "nome", "data di nascita": "data_nascita", "sesso": "sesso", "numero del documento": "numero_documento" }[d], c = m.mrz.controlli;
+        if (k && (k !== "numero_documento" || c.numero) && (k !== "data_nascita" || c.nascita)) p[k] = m[k];
       });
+      if (m.tipo_documento && p.tipo_documento !== m.tipo_documento && /^P/.test(m.mrz.tipo || "")) p.tipo_documento = m.tipo_documento;
     } else P.push(m);
-  }
+  });
+  return P;
+}
+
+/* separa i documenti: righe vuote tra l'uno e l'altro; le righe MRZ da sole stanno con il documento sopra */
+function blocchi(t) {
+  var ch = String(t || "").replace(/\r/g, "").split(/\n[ \t]*\n/).map(function (c) { return c.trim(); }).filter(Boolean), out = [];
+  ch.forEach(function (c) {
+    var mrz = MRZ ? mrzTutte(c).length > 0 : false, lab = persone(c).length > 0, prev = out[out.length - 1];
+    if (prev && !lab && (!mrz || !prev.mrz)) {
+      // righe MRZ da sole: stanno con il documento sopra solo se il cognome o il numero coincidono (altrimenti è un altro documento)
+      var stesso = true;
+      if (mrz && prev.lab) { var r = mrzTutte(c)[0], q = persone(prev.t)[0] || {}; stesso = !q.cognome || compatta(q.cognome) === compatta(r.cognome) || (q.numero_documento && compatta(q.numero_documento) === compatta(r.numero)); }
+      if (stesso) { prev.t += "\n" + c; prev.mrz = prev.mrz || mrz; return; }
+    }
+    out.push({ t: c, mrz: mrz, lab: lab });
+  });
+  return out.map(function (b) { return b.t; });
+}
+
+/* due letture della stessa persona (stesso numero, o stesso cognome+nome+data) diventano una sola */
+function raggruppa(P) {
+  var out = [];
+  P.forEach(function (p) {
+    var e = out.filter(function (q) {
+      return (p.numero_documento && q.numero_documento && compatta(p.numero_documento) === compatta(q.numero_documento)) ||
+        (p.cognome && q.cognome && compatta(p.cognome) === compatta(q.cognome) && compatta(p.nome) === compatta(q.nome) && p.data_nascita && p.data_nascita === q.data_nascita);
+    })[0];
+    if (!e) return out.push(p);
+    Object.keys(p).forEach(function (k) { if ((e[k] === undefined || e[k] === "" || e[k] === null) && p[k]) e[k] = p[k]; });
+    e.fonti = (e.fonti || []).concat((p.fonti || []).filter(function (f) { return (e.fonti || []).indexOf(f) < 0; }));
+    e.uniti = (e.uniti || 1) + 1;
+  });
+  return out;
+}
+
+/* Lettura completa. Ritorna { persone:[{...campi, fonti:["testo","mrz"], differenze:[], avvisi:[], dubbi:[]}], note } */
+function leggi(testo) {
+  var t = String(testo || ""), out = { persone: [], note: [] };
+  if (t.length > 40000) { out.note.push("Testo troppo lungo: incolla solo la parte dei documenti."); return out; }
+  var P = [];
+  blocchi(t).forEach(function (b) { P = P.concat(leggiBlocco(b)); });
+  P = raggruppa(P);
   P.forEach(function (p) {
     p.dubbi = [].concat(p.differenze || []).map(function (d) { return { "data di nascita": "data_nascita", "numero del documento": "numero_documento" }[d] || d; });
-    p.avvisi = [];
+    p.avvisi = (p.pulizia || []).slice(); if (p.numero_corretto) p.dubbi.push("numero_documento");
     if (p.mrz) {
       if (!p.mrz.controlli.numero) { p.dubbi.push("numero_documento"); p.avvisi.push("Le cifre di controllo del numero non tornano: ricontrolla il numero."); }
       if (!p.mrz.controlli.nascita) { p.dubbi.push("data_nascita"); p.avvisi.push("Le cifre di controllo della data di nascita non tornano."); }
     }
     if (p.differenze && p.differenze.length) p.avvisi.push("Il testo e le righe MRZ non coincidono su: " + p.differenze.join(", ") + ".");
+    if (p.codice_fiscale) {
+      var cc = cfControlla(p, p.codice_fiscale); p.avvisi = p.avvisi.concat(cc.av); p.dubbi = p.dubbi.concat(cc.dub);
+      if (!p.sesso && cc.sesso) p.sesso = cc.sesso; // dal codice fiscale il sesso è certo
+    }
     if (p.incerto_prov) { p.dubbi.push("comune_nascita"); p.avvisi.push("Ho letto «" + p.comune_nascita + " " + p.provincia_nascita + "» come comune e provincia: controlla."); }
   });
   out.persone = P;
@@ -184,6 +346,6 @@ function leggi(testo) {
   return out;
 }
 
-var api = { leggi: leggi, persone: persone, confronta: confronta, dataNorm: dataNorm, tipoDocDa: tipoDocDa, sessoDa: sessoDa };
+var api = { dividi: dividi, correggiNumero: correggiNumero, blocchi: blocchi, raggruppa: raggruppa, mrzTutte: mrzTutte, cfValido: cfValido, cfControlla: cfControlla, leggi: leggi, persone: persone, confronta: confronta, dataNorm: dataNorm, tipoDocDa: tipoDocDa, sessoDa: sessoDa };
 if (typeof module !== "undefined" && module.exports) module.exports = api; else root.INC = api;
 })(this);

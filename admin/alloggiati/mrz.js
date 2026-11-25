@@ -38,7 +38,10 @@ function data(yymmdd, futuro) {
   return dd + "/" + mm + "/" + y;
 }
 function nomi(s) {
-  s = alpha(s).replace(/([<K]{3,}|<+K+<*|K{2,}<*)$/, "").replace(/<+$/, "");
+  s = alpha(s);
+  var coda = /[<K]+$/.exec(s); // la lettura confonde spesso < con K: se in coda c'è una sola K è l'ultima lettera del nome (ERIK), non un riempitivo
+  if (coda && (coda[0].match(/K/g) || []).length >= 2) s = s.replace(/([<K]{3,}|<+K+<*|K{2,}<*)$/, "");
+  s = s.replace(/<+$/, "");
   var p = s.split(/<<+/), cog = (p[0] || "").replace(/</g, " ").trim(), nom = p.slice(1).join(" ").replace(/</g, " ").replace(/\s+/g, " ").trim();
   return { cognome: cog, nome: nom };
 }

@@ -40,6 +40,34 @@ ok("due persone nello stesso testo", () => {
   const r = INC.leggi("Cognome: VERDI\nNome: ANNA\nData di nascita: 01/01/1990\nSesso: F\n\nCognome: NERI\nNome: PAOLO\nData di nascita: 02/02/1985\nSesso: M");
   assert.equal(r.persone.length, 2); assert.equal(r.persone[1].cognome, "NERI");
 });
+ok("CIE su una sola riga (testo copiato da una foto)", () => {
+  const r = INC.leggi("REPUBBLICA ITALIANA MINISTERO DELL'INTERNO CARTA DI IDENTITA' Cognome Surname ROSSI Nome Name MARIO Luogo e data di nascita Place and date of birth BRESCIA (BS) 10.12.1985 Sesso Sex M Statura Height 175 Cittadinanza Nationality ITA Emissione Issuing 01.01.2020 Scadenza Expiry 10.12.2030 Emesso da Issued by COMUNE DI ROMA CA12345AB");
+  const p = r.persone[0]; assert.equal(r.persone.length, 1);
+  assert.equal(p.cognome, "ROSSI"); assert.equal(p.nome, "MARIO"); assert.equal(p.data_nascita, "10/12/1985");
+  assert.equal(p.comune_nascita, "BRESCIA"); assert.equal(p.provincia_nascita, "BS"); assert.equal(p.sesso, "M"); assert.equal(p.cittadinanza, "ITA");
+  assert.equal(p.tipo_documento, "IDENT"); assert.match(p.rilascio_testo, /ROMA/);
+});
+ok("carta d'identità cartacea", () => {
+  const r = INC.leggi("COMUNE DI ROMA\nCARTA D'IDENTITA' N° AA 1234567\nCognome ROSSI\nNome MARIO\nnato il 10.12.1985\na BRESCIA (BS)\nCittadinanza ITALIANA\nResidenza ROMA\nStato civile CELIBE\nProfessione IMPIEGATO\nStatura 1.75");
+  const p = r.persone[0]; assert.equal(p.cognome, "ROSSI"); assert.equal(p.data_nascita, "10/12/1985"); assert.equal(p.comune_nascita, "BRESCIA");
+  assert.equal(p.numero_documento, "AA1234567"); assert.equal(p.tipo_documento, "IDENT"); assert.equal(p.cittadinanza, "ITALIANA");
+});
+ok("passaporto italiano", () => {
+  const r = INC.leggi("PASSAPORTO / PASSPORT\nCognome / Surname\nBIANCHI\nNome / Given names\nLUCA\nCittadinanza / Nationality\nITALIANA\nData di nascita / Date of birth\n05 GIU/JUN 90\nSesso / Sex\nM\nLuogo di nascita / Place of birth\nMILANO (MI)\nData di rilascio / Date of issue\n01 GEN/JAN 20\nAutorità / Authority\nQUESTURA DI ROMA\nN. passaporto / Passport No\nYA1234567");
+  const p = r.persone[0]; assert.equal(p.data_nascita, "05/06/1990"); assert.equal(p.comune_nascita, "MILANO"); assert.equal(p.numero_documento, "YA1234567"); assert.equal(p.tipo_documento, "PASOR"); assert.match(p.rilascio_testo, /QUESTURA DI ROMA/);
+});
+ok("carta tedesca con etichette bilingui", () => {
+  const r = INC.leggi("PERSONALAUSWEIS\nName/Surname\nMUELLER\nVornamen/Given names\nHANS PETER\nGeburtsdatum/Date of birth\n12.03.1975\nStaatsangehörigkeit/Nationality\nD\nGeburtsort/Place of birth\nBERLIN\nDokumentnummer\nT220001293");
+  const p = r.persone[0]; assert.equal(p.cognome, "MUELLER"); assert.equal(p.nome, "HANS PETER"); assert.equal(p.data_nascita, "12/03/1975"); assert.equal(p.numero_documento, "T220001293");
+});
+ok("codice fiscale: controllo di nome, data e sesso", () => {
+  const ok1 = INC.leggi("Cognome ROSSI\nNome MARIO\nData di nascita 10/12/1985\nSesso M\nCodice fiscale RSSMRA85T10A562S").persone[0];
+  assert.deepEqual(ok1.avvisi, []); assert.equal(ok1.codice_fiscale, "RSSMRA85T10A562S");
+  const male = INC.leggi("Cognome ROSSI\nNome MARIO\nData di nascita 11/12/1985\nSesso F\nCodice fiscale RSSMRA85T10A562S").persone[0];
+  assert.ok(male.dubbi.includes("data_nascita") && male.dubbi.includes("sesso"));
+  const rotto = INC.leggi("Cognome ROSSI\nNome MARIO\nCodice fiscale RSSMRA85T10A562X").persone[0];
+  assert.ok(rotto.avvisi.some((a) => /cifra di controllo/.test(a)));
+});
 ok("testo senza dati", () => assert.equal(INC.leggi("ciao a tutti").persone.length, 0));
 
 const tab = { "100000100": { c: "100000100", n: "ITALIA", p: "EE" }, "100000216": { c: "100000216", n: "FRANCIA", p: "EE" }, "412058091": { c: "412058091", n: "ROMA", p: "RM" } };
