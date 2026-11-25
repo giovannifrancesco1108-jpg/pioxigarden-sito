@@ -95,7 +95,7 @@ details[open].card>summary::after{content:"▴"}
 </section>
 
 <div id="tool" hidden style="display:grid;gap:18px">
-<p class="safe" id="nota">🔒 Foto e dati degli ospiti non vengono salvati: vanno solo al portale della Polizia e, per la lettura, all'AI.</p>
+<p class="safe" id="nota">🔒 I documenti si leggono qui sul telefono e non vengono salvati: i dati vanno solo al portale della Polizia.</p>
 
 <details class="card" id="cfg">
  <summary><h2>Collegamenti</h2><span class="row" style="gap:6px"><span class="pill" id="pPort"><i></i><span>Portale</span></span><span class="pill" id="pAi"><i></i><span>Lettura AI</span></span></span></summary>
@@ -113,7 +113,8 @@ details[open].card>summary::after{content:"▴"}
    <div class="row"><button class="btn g s" type="button" id="tabUpd">Aggiorna le tabelle</button><button class="btn ko s" type="button" id="cDel">Scollega</button></div>
   </div>
   <p class="msg" id="mC" role="status"></p>
-  <h3 style="margin-top:8px">Lettura dei documenti con l'AI</h3>
+  <h3 style="margin-top:8px">Lettura con l'AI (facoltativa)</h3>
+  <p class="hint">Non serve: i documenti con le righe &lt;&lt;&lt; si leggono sul telefono. Se colleghi l'AI, la uso solo per i documenti che non le hanno (vecchie carte d'identità, patenti).</p>
   <div id="aiOff" style="display:grid;gap:12px">
    <label>Chiave API di Anthropic (inizia con sk-ant-)<input type="password" id="aK" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="sk-ant-…"></label>
    <p class="hint">console.anthropic.com → API Keys → Create Key. Si paga a consumo, con credito caricato prima: il costo di ogni lettura lo vedi nella console. Resta solo sul server.</p>
@@ -126,7 +127,7 @@ details[open].card>summary::after{content:"▴"}
 
 <section class="card" id="nuova">
  <h2>Nuova comunicazione</h2>
- <label class="drop big" id="drop"><b>📷 Fotografa i documenti</b><span>Uno o più documenti, anche fronte e retro: li leggo e compilo io. Poi controlli tu.</span><input type="file" id="foto" accept="image/*" multiple></label>
+ <label class="drop big" id="drop"><b>📷 Fotografa i documenti</b><span>Il lato con le righe &lt;&lt;&lt; (passaporto, retro della carta d'identità): leggo i dati qui sul telefono. Poi controlli tu.</span><input type="file" id="foto" accept="image/*" multiple></label>
  <div class="grid2">
   <label>Giorno di arrivo<input type="date" id="arr"></label>
   <label>Notti<input type="number" id="notti" inputmode="numeric" min="1" max="30" step="1" value="1"></label>
@@ -162,6 +163,7 @@ details[open].card>summary::after{content:"▴"}
  <button class="btn" type="button" id="bInv">Invia alla Questura</button>
 </div></div>
 
+<script src="/admin/alloggiati/mrz.js"></script>
 <script>
 (function(){
 "use strict";
@@ -250,18 +252,56 @@ function ac(input,L,pick){var ul=null,sel=-1,res=[];
 /* ---------- foto → lettura con l'AI ---------- */
 function comprimi(file){return new Promise(function(ok,no){var u=URL.createObjectURL(file),im=new Image();im.onload=function(){var M=1600,s=Math.min(1,M/Math.max(im.naturalWidth,im.naturalHeight)),c=document.createElement("canvas");c.width=Math.round(im.naturalWidth*s);c.height=Math.round(im.naturalHeight*s);c.getContext("2d").drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);
   var d=c.toDataURL("image/jpeg",.85);ok({type:"image/jpeg",data:d.split(",")[1],url:d})};im.onerror=function(){URL.revokeObjectURL(u);no(new Error("foto"))};im.src=u})}
+/* lettore sul telefono (Tesseract, codice libero): si scarica una volta, poi resta nella memoria del browser */
+var TESS=null;
+function lettore(){if(TESS)return TESS;
+ TESS=new Promise(function(ok,no){var sc=document.createElement("script");sc.src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";sc.onload=ok;sc.onerror=function(){no(new Error("lettore"))};document.head.appendChild(sc)})
+  .then(function(){return Tesseract.createWorker("eng",1,{langPath:location.origin+"/assets/vendor/tess",gzip:true})})
+  .then(function(w){return w.setParameters({tessedit_char_whitelist:"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<",tessedit_pageseg_mode:"6"}).then(function(){return w})})
+  .catch(function(e){TESS=null;throw e});
+ return TESS}
+function immagine(file){return new Promise(function(ok,no){var u=URL.createObjectURL(file),im=new Image();im.onload=function(){ok({im:im,u:u})};im.onerror=function(){URL.revokeObjectURL(u);no(new Error("foto"))};im.src=u})}
+function tela(im,rot,M){var w=im.naturalWidth,h=im.naturalHeight,s=Math.min(1,M/Math.max(w,h)),W=Math.round(w*s),H=Math.round(h*s),c=document.createElement("canvas"),r=rot%180!==0;
+ c.width=r?H:W;c.height=r?W:H;var x=c.getContext("2d");x.translate(c.width/2,c.height/2);x.rotate(rot*Math.PI/180);x.drawImage(im,-W/2,-H/2,W,H);
+ var d=x.getImageData(0,0,c.width,c.height),p=d.data,mn=255,mx=0,i,g;for(i=0;i<p.length;i+=4){g=(p[i]*.3+p[i+1]*.59+p[i+2]*.11)|0;p[i]=g;if(g<mn)mn=g;if(g>mx)mx=g}
+ var k=255/Math.max(1,mx-mn);for(i=0;i<p.length;i+=4){g=(p[i]-mn)*k;p[i]=p[i+1]=p[i+2]=g}x.putImageData(d,0,0);return c}
+function anteprima(im){var s=Math.min(1,900/Math.max(im.naturalWidth,im.naturalHeight)),c=document.createElement("canvas");c.width=Math.round(im.naturalWidth*s);c.height=Math.round(im.naturalHeight*s);c.getContext("2d").drawImage(im,0,0,c.width,c.height);return c.toDataURL("image/jpeg",.8)}
+function leggiMRZ(w,im){var giri=[0,90,270,180],i=0;
+ function prova(){if(i>=giri.length)return Promise.resolve(null);var c=tela(im,giri[i++],2000);
+  return w.recognize(c).then(function(r){var x=MRZ.leggi(r.data.text);return x||prova()})}
+ return prova()}
+function daMRZ(r,foto){var g=nuovo({cognome:r.cognome,nome:r.nome,sesso:r.sesso,data_nascita:r.nascita,numero_documento:r.numero});g.foto=foto;
+ var paese=function(c){return MRZ.PAESI[c]?trova(TAB.stati,MRZ.PAESI[c]):null},naz=paese(r.nazionalita),em=paese(r.emittente);
+ if(naz){g.citt=naz.c;g.statoN=naz.c}else g.dubbi.cittadinanza=1;
+ g.dubbi.stato_nascita=1; // la MRZ non dice dove è nato: di solito è il paese della cittadinanza
+ if(g.statoN===ITALIA)g.dubbi.comune_nascita=1;
+ var t=r.tipo||"";g.doc=/^P/.test(t)?"PASOR":/^C/.test(t)&&r.emittente==="ITA"?"IDELE":/^[IAC]/.test(t)?"IDENT":"";if(!TAB.doc.some(function(d){return d.c===g.doc}))g.doc="";if(!g.doc)g.dubbi.tipo_documento=1;
+ if(r.emittente==="ITA")g.dubbi.rilascio=1;else if(em)g.ril=em.c;else g.dubbi.rilascio=1;
+ if(!r.controlli.numero)g.dubbi.numero_documento=1;if(!r.controlli.nascita||!r.nascita)g.dubbi.data_nascita=1;if(!r.sesso)g.dubbi.sesso=1;
+ if(!r.cognome)g.dubbi.cognome=1;if(!r.nome)g.dubbi.nome=1;
+ return g}
 $("foto").addEventListener("change",function(){var fs=[].slice.call(this.files||[]);this.value="";if(!fs.length)return;
- if(!ST.ai)return say($("mL"),"Per leggere le foto collega prima l'AI in «Collegamenti». Intanto puoi aggiungere l'ospite a mano.");
- if(fs.length>4){say($("mL"),"Al massimo 4 foto per volta: leggo le prime 4.");fs=fs.slice(0,4)}
- say($("mL"),"Leggo "+(fs.length>1?"le foto":"la foto")+"…",true);$("drop").style.pointerEvents="none";
- Promise.all(fs.map(comprimi)).then(function(im){return api("POST","leggi",{immagini:im.map(function(x){return{type:x.type,data:x.data}})}).then(function(j){
-   var urls=im.map(function(x){return x.url});if(!j.persone.length){say($("mL"),"Non ho trovato documenti nelle foto: riprova con più luce, o aggiungi l'ospite a mano.");return}
-   j.persone.forEach(function(p){G.push(daAI(p,j.persone.length===1?urls:[]))});ESITI=null;render();
-   var dub=!!$("ospiti").querySelector(".dubbio");
-   say($("mL"),"Letto"+(j.persone.length>1?": "+j.persone.length+" persone":"")+". "+(dub?"Controlla i campi in giallo.":"Controlla comunque i dati prima di inviare."),true);
-   $("ospiti").lastElementChild.scrollIntoView({behavior:"smooth",block:"start"})})})
- .catch(function(e){say($("mL"),{limite:"Raggiunto il limite di letture di oggi.",ai_mancante:"Collega prima l'AI in «Collegamenti».",ai_chiave:"La chiave dell'AI non è più valida: ricollegala.",foto:"Questa foto non si apre: prova a fotografare di nuovo."}[e.code||e.message]||e.detail||"Lettura non riuscita: riprova.")})
+ if(fs.length>6){say($("mL"),"Al massimo 6 foto per volta: leggo le prime 6.");fs=fs.slice(0,6)}
+ $("drop").style.pointerEvents="none";var nuovi=[],senza=[],n=0,prima=!TESS;
+ say($("mL"),prima?"Preparo il lettore (solo la prima volta, qualche secondo)…":"Leggo…",true);
+ lettore().then(function(w){
+  return fs.reduce(function(pr,f){return pr.then(function(){n++;say($("mL"),"Leggo la foto "+n+" di "+fs.length+"…",true);
+   return immagine(f).then(function(x){var u=anteprima(x.im);return leggiMRZ(w,x.im).then(function(r){URL.revokeObjectURL(x.u);
+    if(r){var g=daMRZ(r,senza.concat([u]));senza=[];nuovi.push(g)}else senza.push(u)})})})},Promise.resolve())})
+ .then(function(){
+  if(senza.length&&nuovi.length){nuovi[nuovi.length-1].foto=nuovi[nuovi.length-1].foto.concat(senza);senza=[]}
+  if(!nuovi.length&&senza.length&&ST.ai){say($("mL"),"Non trovo le righe <<<: provo con l'AI…",true);return leggiConAI(fs)}
+  nuovi.forEach(function(g){G.push(g)});
+  if(!nuovi.length){var g=nuovo();g.foto=senza;G.push(g)}
+  ESITI=null;render();
+  say($("mL"),nuovi.length?"Letto"+(nuovi.length>1?": "+nuovi.length+" persone":"")+". Completa i campi in giallo guardando la foto (per gli italiani: comune di nascita e luogo di rilascio).":"Non trovo le righe <<< in queste foto: fotografa il lato con le righe <<<, oppure compila guardando la foto.",nuovi.length>0);
+  $("ospiti").lastElementChild.scrollIntoView({behavior:"smooth",block:"start"})})
+ .catch(function(e){say($("mL"),e.message==="lettore"?"Non riesco a scaricare il lettore: controlla la connessione e riprova.":e.message==="foto"?"Questa foto non si apre: prova a fotografare di nuovo.":"Lettura non riuscita: riprova o compila a mano.")})
  .then(function(){$("drop").style.pointerEvents=""})});
+function leggiConAI(fs){return Promise.all(fs.slice(0,4).map(comprimi)).then(function(im){return api("POST","leggi",{immagini:im.map(function(x){return{type:x.type,data:x.data}})}).then(function(j){
+  var urls=im.map(function(x){return x.url});if(!j.persone.length){var g=nuovo();g.foto=urls;G.push(g);render();say($("mL"),"Non riesco a leggere il documento: compila guardando la foto.");return}
+  j.persone.forEach(function(p){G.push(daAI(p,j.persone.length===1?urls:[]))});ESITI=null;render();say($("mL"),"Letto con l'AI. Controlla i campi in giallo.",true)})})
+ .catch(function(e){var g=nuovo();G.push(g);render();say($("mL"),"Lettura non riuscita: compila a mano.")})}
 $("aMano").onclick=function(){G.push(nuovo());ESITI=null;render();var l=$("ospiti").lastElementChild;l.scrollIntoView({behavior:"smooth",block:"start"});l.querySelector("input").focus({preventScroll:true})};
 $("tipo").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;tipo=b.dataset.t;[].forEach.call(this.children,function(x){x.setAttribute("aria-pressed",x===b)});ESITI=null;render()});
 
