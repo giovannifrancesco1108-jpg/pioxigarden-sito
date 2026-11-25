@@ -186,7 +186,8 @@ function leggiLuoghi(t){var R=righe(t);if(!R.length)return;var k=colonne(R),iC,i
  R.forEach(function(r){var c=r[iC],n=r[iD];if(!/^\d{9}$/.test(c||"")||!n)return;var f=iF>=0?(r[iF]||""):"",o={c:c,n:n.toUpperCase(),k:norm(n),p:iP>=0?(r[iP]||"").toUpperCase():"",x:!!f&&f!=="0"};
   (/^100000/.test(c)?TAB.stati:TAB.comuni).push(o)})}
 function leggiDoc(t){righe(t).forEach(function(r){var i=r.findIndex(function(x){return /^[A-Z0-9]{5}$/.test(x)});if(i<0)return;var d=r.find(function(x,j){return j!==i&&/[A-Za-z]{3}/.test(x)})||r[i];TAB.doc.push({c:r[i],n:d.toUpperCase()})})}
-function leggiApp(t){righe(t).forEach(function(r){var i=r.findIndex(function(x){return /^\d{1,6}$/.test(x)});if(i<0)return;TAB.app.push({c:r[i],n:r.filter(function(x,j){return j!==i&&x}).join(" · ")||("Appartamento "+r[i])})})}
+function leggiApp(t){var R=righe(t),h=-1;R.forEach(function(r){if(h<0&&r.some(function(x){return /^id.?app/i.test(x)}))h=r.findIndex(function(x){return /^id.?app/i.test(x)})});
+ R.forEach(function(r){var i=h>=0?(/^\d{1,6}$/.test(r[h]||"")?h:-1):r.findIndex(function(x){return /^\d{1,6}$/.test(x)&&+x>0});if(i<0||!(+r[i]>0))return;TAB.app.push({c:String(+r[i]),n:"ID "+(+r[i])+" · "+(r.filter(function(x,j){return j!==i&&x&&!/^\d{1,6}$/.test(x)}).join(" · ")||"Appartamento")})})}
 var DOC_BASE=[{c:"IDENT",n:"CARTA DI IDENTITA'"},{c:"IDELE",n:"CARTA IDENTITA' ELETTRONICA"},{c:"PASOR",n:"PASSAPORTO ORDINARIO"},{c:"PATEN",n:"PATENTE DI GUIDA"}];
 function caricaTabelle(){return api("GET","tabelle").then(function(j){TAB={stati:[],comuni:[],doc:[],app:[]};
  if(j.luoghi)leggiLuoghi(j.luoghi);if(j.documenti)leggiDoc(j.documenti);if(j.appartamenti)leggiApp(j.appartamenti);if(!TAB.doc.length)TAB.doc=DOC_BASE.slice();
