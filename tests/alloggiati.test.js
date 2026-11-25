@@ -45,12 +45,12 @@ ok("CIE su una sola riga (testo copiato da una foto)", () => {
   const p = r.persone[0]; assert.equal(r.persone.length, 1);
   assert.equal(p.cognome, "ROSSI"); assert.equal(p.nome, "MARIO"); assert.equal(p.data_nascita, "10/12/1985");
   assert.equal(p.comune_nascita, "BRESCIA"); assert.equal(p.provincia_nascita, "BS"); assert.equal(p.sesso, "M"); assert.equal(p.cittadinanza, "ITA");
-  assert.equal(p.tipo_documento, "IDENT"); assert.match(p.rilascio_testo, /ROMA/);
+  assert.equal(p.tipo_documento, "IDELE"); // numero CA…: carta elettronica assert.match(p.rilascio_testo, /ROMA/);
 });
 ok("carta d'identità cartacea", () => {
   const r = INC.leggi("COMUNE DI ROMA\nCARTA D'IDENTITA' N° AA 1234567\nCognome ROSSI\nNome MARIO\nnato il 10.12.1985\na BRESCIA (BS)\nCittadinanza ITALIANA\nResidenza ROMA\nStato civile CELIBE\nProfessione IMPIEGATO\nStatura 1.75");
   const p = r.persone[0]; assert.equal(p.cognome, "ROSSI"); assert.equal(p.data_nascita, "10/12/1985"); assert.equal(p.comune_nascita, "BRESCIA");
-  assert.equal(p.numero_documento, "AA1234567"); assert.equal(p.tipo_documento, "IDENT"); assert.equal(p.cittadinanza, "ITALIANA");
+  assert.equal(p.numero_documento, "AA1234567"); assert.equal(p.tipo_documento, "IDENT"); assert.equal(p.cittadinanza, "ITA"); // l'aggettivo diventa il codice del paese
 });
 ok("passaporto italiano", () => {
   const r = INC.leggi("PASSAPORTO / PASSPORT\nCognome / Surname\nBIANCHI\nNome / Given names\nLUCA\nCittadinanza / Nationality\nITALIANA\nData di nascita / Date of birth\n05 GIU/JUN 90\nSesso / Sex\nM\nLuogo di nascita / Place of birth\nMILANO (MI)\nData di rilascio / Date of issue\n01 GEN/JAN 20\nAutorità / Authority\nQUESTURA DI ROMA\nN. passaporto / Passport No\nYA1234567");
@@ -91,13 +91,13 @@ ok("insieme: arrivo, notti, doppioni, tabelle", () => {
 });
 console.log(n + " prove superate");
 
-/* ---- OCR sporco di documenti esteri (testo reale incollato dall'utente, dati d'esempio) ---- */
+/* ---- OCR sporco di documenti esteri (storpiature di un OCR vero, dati INVENTATI) ---- */
 (function () {
-  const t = "SLOVENSKA REPUBLIKA SLOVAK REPURLIC\nOBCUNSKY PREUKAZ :ID-CARD\nPelecciseo / Sumame\nKovalčik\nento/ Govee names\nPeter\nSrlere sociaservs / Netionolty\nSVK\nhsmesce\nM\n07.07.1987\nHosne oroveuro\n870707/9634\nSVK\nMG029748\nDatum platnasti / Dote of expin\n23.06.2031\nwwln ano oe ge ls\nSpišská Nová Ves\n23.06.2021 Podis dritelo / Sgnature\ntárdck";
+  const t = "SLOVENSKA REPUBLIKA SLOVAK REPURLIC\nOBCUNSKY PREUKAZ :ID-CARD\nPelecciseo / Sumame\nHudák\nento/ Govee names\nMartin\nSrlere sociaservs / Netionolty\nSVK\nhsmesce\nM\n12.03.1979\nHosne oroveuro\n790312/4417\nSVK\nEK518204\nDatum platnasti / Dote of expin\n14.09.2032\nwwln ano oe ge ls\nPoprad\n14.09.2022 Podis dritelo / Sgnature\ntárdck";
   const r = INC.leggi(t); assert.equal(r.persone.length, 1);
   const p = r.persone[0];
-  assert.equal(p.cognome, "KOVALCIK"); assert.equal(p.nome, "PETER"); assert.equal(p.cittadinanza, "SVK");
-  assert.equal(p.data_nascita, "07/07/1987"); assert.equal(p.sesso, "M"); assert.equal(p.numero_documento, "MG029748");
+  assert.equal(p.cognome, "HUDAK"); assert.equal(p.nome, "MARTIN"); assert.equal(p.cittadinanza, "SVK");
+  assert.equal(p.data_nascita, "12/03/1979"); assert.equal(p.sesso, "M"); assert.equal(p.numero_documento, "EK518204");
   assert.ok(p.dubbi.includes("data_nascita") && p.dubbi.includes("numero_documento"), "i campi trovati senza etichetta restano da controllare");
   assert.equal(INC.ripara("Vorname"), "Vorname", "un'etichetta vera non va cambiata");
   assert.equal(INC.ripara("Given names"), "Given names");
@@ -155,11 +155,11 @@ console.log(n + " prove superate");
   console.log("ok  CIE italiana: tre etichette su una riga e nato all'estero");
 })();
 (function () {
-  const sporco = ".* * x PATENTE DI GUIDA REPUBBLICA ITALIANA\nwi | i 1. VERDI\nke KL 2. PAOLO\n3. 16/02/73 GENOVA (GE)\n4a, 04/11/2022 4c. MIT-UCO\n> <a 4b. 16/02/2033\n77 5, U188L2809S\n—a 7.";
+  const sporco = ".* * x PATENTE DI GUIDA REPUBBLICA ITALIANA\nwi | i 1. VERDI\nke KL 2. PAOLO\n3. 07/05/71 SAVONA (SV)\n4a, 04/11/2022 4c. MIT-UCO\n> <a 4b. 16/02/2033\n77 5, U172K3301B\n—a 7.";
   const a = INC.leggi(sporco).persone[0];
-  assert.equal(a.cognome, "VERDI"); assert.equal(a.nome, "PAOLO"); assert.equal(a.data_nascita, "16/02/1973");
-  assert.equal(a.comune_nascita, "GENOVA"); assert.equal(a.numero_documento, "U188L2809S");
-  const b = INC.leggi("PATENTE DI GUIDA REPUBBLICA ITALIANA\n\n1\n\nVERDI\n\n2\n\nPAOLO\n\n3\n\n16/02/73\n\nGENOVA (GE)\n\n5, U188L2809S").persone[0];
+  assert.equal(a.cognome, "VERDI"); assert.equal(a.nome, "PAOLO"); assert.equal(a.data_nascita, "07/05/1971");
+  assert.equal(a.comune_nascita, "SAVONA"); assert.equal(a.numero_documento, "U172K3301B");
+  const b = INC.leggi("PATENTE DI GUIDA REPUBBLICA ITALIANA\n\n1\n\nVERDI\n\n2\n\nPAOLO\n\n3\n\n07/05/71\n\nSAVONA (SV)\n\n5, U172K3301B").persone[0];
   assert.equal(b.cognome, "VERDI"); assert.equal(b.nome, "PAOLO");
   console.log("ok  patente con OCR sporco (rumore, numeri su righe separate)");
 })();
@@ -172,10 +172,10 @@ console.log(n + " prove superate");
   assert.equal(p.cognome, "BIANCHI"); assert.equal(p.nome, "LUCA");
   assert.equal(p.comune_nascita, "SIENA"); assert.equal(p.provincia_nascita, "SI");
   // il riempitivo della MRZ letto «cccc» non finisce nel nome
-  const m = INC.leggi("Surname\nJOB\nGiven names\nELEANOR ALEXANDRA CCECCEECEGCC\nDate of birth\n24 APR 98\nSex\nF").persone[0];
-  assert.equal(m.nome, "ELEANOR ALEXANDRA");
+  const m = INC.leggi("Surname\nPRICE\nGiven names\nHANNAH LOUISE CCECCEECEGCC\nDate of birth\n11 MAR 90\nSex\nF").persone[0];
+  assert.equal(m.nome, "HANNAH LOUISE");
   // la patente non ha sesso né cittadinanza: non se li inventa
-  const pat = INC.leggi("PATENTE DI GUIDA REPUBBLICA ITALIANA\n1. DONATO\n2. PAOLO\n3. 16/02/73 GENOVA (GE)\n5. U188L2809S\n9. AB\nF").persone[0];
+  const pat = INC.leggi("PATENTE DI GUIDA REPUBBLICA ITALIANA\n1. VERDI\n2. PAOLO\n3. 07/05/71 SAVONA (SV)\n5. U172K3301B\n9. AB\nF").persone[0];
   assert.ok(!pat.sesso && !pat.cittadinanza);
   console.log("ok  OCR sporco: simboli ai lati, provincia {S1), riempitivo MRZ, patente");
 })();
@@ -192,4 +192,65 @@ console.log(n + " prove superate");
   const altra = "Surname\nKOVAC\nGiven names\nPETER\nDate of birth\n11.11.1970\nSex\nM\nNationality\nSVK\nPassport No\nCD7654321";
   assert.equal(INC.unisci([buona, altra, buona, altra]).persone.length, 2);
   console.log("ok  più letture della stessa foto unite con il voto");
+})();
+
+(function () { // rumore: nessuna persona inventata
+  assert.equal(INC.unisci(["xx\nNumber AB1234567 qq", "Sex\nM\nboh"]).persone.length, 0);
+  console.log("ok  letture senza dati veri non creano ospiti vuoti");
+})();
+
+// ---- lettura ad ancore (dati INVENTATI, impaginazioni e storpiature viste nelle foto vere) ----
+(function () {
+  // passaporto britannico: sesso e luogo sulla stessa riga, data «06 JAN /JAN 67», numero dopo «P GBR»
+  const uk = INC.leggi("UNITED KINGDOM OF GREAT BRITAIN AND NORTHERN IRELAND\nPASSPORT\nType/Type Code/Code Passport No./Passeport No.\nP GBR 540001974\nSurname/Nom (1)\nHARLOW\nGiven names/Prenoms (2)\nSOPHIE CLAIRE\nNationality/Nationalite (3)\nBRITISH CITIZEN\nDate of birth/Date de naissance (4)\n06 JAN /JAN 67\nSex/Sexe (5) Place of birth/Lieu de naissance (6)\nF READING\nDate of issue/Date de delivrance (7) Authority/Autorite (8)\n07 NOV /NOV 17 HMPO\nDate of expiry/Date d'expiration (9)\n19 SEP /SEP 31").persone[0];
+  assert.equal(uk.sesso, "F"); assert.equal(uk.numero_documento, "540001974"); assert.equal(uk.cittadinanza, "GBR");
+  assert.equal(uk.data_nascita, "06/01/1967"); assert.equal(uk.luogo_nascita, "READING"); assert.equal(uk.rilascio_stato, "REGNO UNITO");
+  // carta francese: sesso, nazionalità e data su una riga; nomi «Marie, Anne»
+  const fr = INC.leggi("REPUBLIQUE FRANCAISE\nCARTE NATIONALE D'IDENTITE / IDENTITY CARD\nNOM / Surname\nLE GALL\nPrenoms / Given names\nMarie, Anne\nSEXE / Sex NATIONALITE / Nationality DATE DE NAISS. / Date of birth\nF FRA 04 10 1947\nLIEU DE NAISSANCE / Place of birth\nRODEZ\nN DU DOCUMENT / Document No. DATE D'EXPIR / Expiry date\nSP84N4U31 10 10 2029").persone[0];
+  assert.equal(fr.sesso, "F"); assert.equal(fr.data_nascita, "04/10/1947"); assert.equal(fr.numero_documento, "SP84N4U31"); assert.equal(fr.nome, "MARIE ANNE");
+  // DNI spagnolo: i due cognomi su due righe
+  const es = INC.leggi("REINO DE ESPANA\nDOCUMENTO NACIONAL DE IDENTIDAD\nAPELLIDOS\nMORENO\nDIAZ\nNOMBRE\nJAVIER\nSEXO NACIONALIDAD\nM ESP\nFECHA DE NACIMIENTO\n14 07 1988\nNUM SOPORTE\nBAF482913").persone[0];
+  assert.equal(es.cognome, "MORENO DIAZ"); assert.equal(es.nome, "JAVIER"); assert.equal(es.data_nascita, "14/07/1988"); assert.equal(es.rilascio_stato, "SPAGNA");
+  // carta cartacea: «a CITTÀ (PR)» su una riga a sé
+  const ca = INC.leggi("REPUBBLICA ITALIANA\nCOMUNE DI ROMA\nCARTA D'IDENTITA N. AB1234567\nCognome ROSSI\nNome MARIO\nnato il 01.02.1980\n(atto n. 12 P. I S. A)\na CATANIA (CT)\nCittadinanza ITALIANA").persone[0];
+  assert.equal(ca.comune_nascita, "CATANIA"); assert.equal(ca.provincia_nascita, "CT"); assert.equal(ca.cittadinanza, "ITA");
+  // CIE: numero letto con le lettere finali come cifre («CA4830175» → «CA48301TS»), comune di rilascio dall'etichetta
+  const cie = INC.leggi("REPUBBLICA ITALIANA\nMINISTERO DELL'INTERNO\nCA4830175\nCARTA DI IDENTITA / IDENTITY CARD\nCOMUNE DI / MUNICIPALITY\nLUCERA\nCOGNOME / SURNAME\nSERRA\nNOME / NAME\nDAVIDE\nLUOGO E DATA DI NASCITA\nPLACE AND DATE OF BIRTH\nSAN SEVERO (FG) 14.05.1999\nSESSO STATURA CITTADINANZA\nSEX HEIGHT NATIONALITY\nM 177 ITA").persone[0];
+  assert.equal(cie.numero_documento, "CA48301TS"); assert.ok(cie.dubbi.indexOf("numero_documento") >= 0, "numero corretto = da controllare");
+  assert.equal(cie.rilascio_comune, "LUCERA"); assert.equal(cie.comune_nascita, "SAN SEVERO");
+  // etichette storpiate dall'OCR: «MIE / SUBNAME», «(0GO E DATA Di NASOTR», «‘SéSSO»
+  const st = INC.leggi("REPUBBLICA ITALIANA\nCA57204KD\nMIE / SUBNAME\nMoRRA\nN'\n/ NAME\nGIANFILIPPO\nPLACE AND DATE OF SiRTH\n(0GO E DATA Di NASOTR\nMELFI (P2) 03.11.1968\n‘SéSSO\nSEX\nM").persone[0];
+  assert.equal(st.cognome, "MORRA"); assert.equal(st.nome, "GIANFILIPPO"); assert.equal(st.comune_nascita, "MELFI"); assert.equal(st.provincia_nascita, "PZ"); assert.equal(st.data_nascita, "03/11/1968");
+  // patente: «4c. MC-PZ» → rilasciata a POTENZA (capoluogo della sigla)
+  const pa = INC.leggi("PATENTE DI GUIDA REPUBBLICA ITALIANA\n1. CARUSO\n2. PIETRO\n3. 11/09/84 LAURIA (PZ)\n4a. 05/06/2021 4c. MC-PZ\n4b. 11/09/2031\n5. PZ7718204K").persone[0];
+  assert.equal(pa.rilascio_comune, "POTENZA");
+  console.log("ok  ancore: passaporto UK, carta francese, DNI, cartacea, CIE storpiata, patente MC-PZ");
+})();
+(function () { // voto tra letture: la coda di spazzatura non vince, il nome troncato si completa
+  const t = (c, n) => "REPUBBLICA ITALIANA\nCOGNOME / SURNAME\n" + c + "\nNOME / NAME\n" + n + "\nLUOGO E DATA DI NASCITA\nACIREALE (CT) 02.06.1960\nSESSO STATURA CITTADINANZA\nM 171 ITA\nCA30118RX";
+  const u = INC.unisci([t("SCIACCA", "GIUSEPPE ANTO"), t("SCIACCA RA", "GIUSEPPE ANTONIO"), t("SCIACCA", "GIUSEPPE ANTONIO"), t("SCIACCA HF WEY", "GIUSEPPE ANTONIO")]).persone[0];
+  assert.equal(u.cognome, "SCIACCA"); assert.equal(u.nome, "GIUSEPPE ANTONIO");
+  assert.equal(INC.leggi(t("ROSSI", "MARIO").replace("02.06.1960", "02.06.3960")).persone[0].data_nascita || "", "", "anno impossibile scartato");
+  console.log("ok  voto tra letture: niente code di spazzatura, nomi troncati completati, date impossibili scartate");
+})();
+(function () { // CIE con le etichette piccole non lette dall'OCR: si ragiona sull'ordine fisso della carta
+  const p = INC.leggi("REPUBBLICA ITALIANA\nCB92388ES\nMINISTERO DELL'INTERNO\nCARTA DI IDENTITA / IDENTITY CARD\nVELLETRI\nD'AMATO\nMARTINA\nTRAPANI (TP) 06.09.1974\nF 168 ITA").persone[0];
+  assert.equal(p.cognome, "D'AMATO"); assert.equal(p.nome, "MARTINA"); assert.equal(p.comune_nascita, "TRAPANI"); assert.equal(p.rilascio_comune, "VELLETRI");
+  assert.ok(p.dubbi.indexOf("cognome") >= 0 && p.dubbi.indexOf("nome") >= 0, "trovati per posizione: da controllare");
+  console.log("ok  CIE senza etichette leggibili: cognome, nome e comune dall'ordine della carta");
+})();
+(function () { // testo copiato dal telefono (Testo dal vivo): etichette spezzate, righe in disordine — dati INVENTATI
+  const us = "IGNATURE OF BEARER/SIGNATURE DU TITULAIRE / FIRMA DEL TITULAR\nPASSPORT\nPASSEPORT / PASAPORTE\nTHE UNITED STATES OF AMERICA\nTypo/Typo/Tipo\nleport/No.\nP\nCode/Code/Codigo\nPassport No/No. du\nUSA\nB12345678\ndo Pasaporte\nSurname/Nom/A\nMILLER\nGiven names/Prónoma/Nombres\nDAVID JAMES\nNationality/Nationalite/Nacionalidad\nUNITED STATES OF AMERICA\nDate of birth/Date de naissance/fecha de necin\n12 MAR 1979\nSex/Sexe/Sexo\nM\nPlace of birth.\nde naissarcarugar\nOHIO, U.S:A\nDate of laal\n03 JUN 2023\nDate\n02 JUN 2033\non/Dateder\nAuthority AutoritalAutoridas\nUNITED STATES DEPARTMENT OF STATE";
+  [{}, { largo: true }].forEach((o) => {
+    const p = INC.leggi(us, o).persone[0];
+    assert.equal(p.cognome, "MILLER"); assert.equal(p.nome, "DAVID JAMES"); assert.equal(p.sesso, "M");
+    assert.equal(p.data_nascita, "12/03/1979", "la data di nascita è la più vecchia, non quella di emissione"); assert.equal(p.cittadinanza, "USA");
+    assert.equal(p.numero_documento, "B12345678"); assert.equal(p.luogo_nascita, "OHIO"); assert.equal(p.stato_nascita, "USA");
+  });
+  const cie = INC.leggi("EPUBBLICA ITALIANA\nCARTA DI IDENTITA / IDENTITY CARD\nCA4830175\nCOMUNE DI\nLUCERA NICIPALITY\nCOGNOME / SUR\nSERRA\nNOME\nRNAME\nNAME\nDAVIDE\nLUOGO E DATA DI NASCITA\nPLACE AND DATE OF BIRTH\nSAN SEVERO (FG) 14.05.1999\nSESSO\nSEX\nM\nCITTADINANZA\nNATIONALITY\nITA", { largo: true });
+  assert.equal(cie.persone.length, 1, "le etichette ripetute non creano un secondo ospite");
+  const c = cie.persone[0];
+  assert.equal(c.cognome, "SERRA"); assert.equal(c.nome, "DAVIDE"); assert.equal(c.numero_documento, "CA48301TS"); assert.equal(c.tipo_documento, "IDELE");
+  assert.equal(c.comune_nascita, "SAN SEVERO"); assert.equal(c.provincia_nascita, "FG");
+  console.log("ok  testo copiato dal telefono: etichette spezzate, «COGNOME / SUR», righe ripetute, date di emissione");
 })();

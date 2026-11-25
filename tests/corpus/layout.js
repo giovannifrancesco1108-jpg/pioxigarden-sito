@@ -3,7 +3,7 @@
 globalThis.MRZ = require("../../admin/alloggiati/mrz.js");
 const INC = require("../../admin/alloggiati/incolla.js");
 let seed = 20261126; const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296, pick = (a) => a[Math.floor(rnd() * a.length)];
-const COGN = ["Kovalčik", "O'Connor", "Müller", "Nowak", "Silva Santos", "Johansson", "Dubois", "Ivanova", "Papadopoulos", "Smith", "Garcia Lopez", "Horváth", "Novák", "Andersen", "Çelik", "Popescu", "Van Der Berg", "Tanaka", "Haddad", "Lindqvist"];
+const COGN = ["Hudák", "O'Connor", "Müller", "Nowak", "Silva Santos", "Johansson", "Dubois", "Ivanova", "Papadopoulos", "Smith", "Garcia Lopez", "Horváth", "Novák", "Andersen", "Çelik", "Popescu", "Van Der Berg", "Tanaka", "Haddad", "Lindqvist"];
 const NOMI = ["Peter", "Aoife", "Jürgen", "Katarzyna", "Maria José", "Erik", "Camille", "Olga", "Nikos", "John", "Ana", "László", "Jana", "Mads", "Emre", "Andrei", "Pieter", "Yuki", "Omar", "Sofia"];
 const PAESI = [["SVK", "Slovak"], ["IRL", "Irish"], ["DEU", "German"], ["POL", "Polish"], ["PRT", "Portuguese"], ["SWE", "Swedish"], ["FRA", "French"], ["BGR", "Bulgarian"], ["GRC", "Greek"], ["GBR", "British"], ["ESP", "Spanish"], ["HUN", "Hungarian"], ["CZE", "Czech"], ["DNK", "Danish"], ["TUR", "Turkish"], ["ROU", "Romanian"], ["NLD", "Dutch"], ["JPN", "Japanese"], ["USA", "American"]];
 const CITTA = ["Bratislava", "Dublin", "Hamburg", "Krakow", "Lisbon", "Stockholm", "Lyon", "Sofia", "Athens", "London", "Madrid", "Budapest", "Prague", "Aarhus", "Ankara", "Cluj", "Utrecht", "Osaka", "Boston"];
