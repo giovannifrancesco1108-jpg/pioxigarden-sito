@@ -98,8 +98,13 @@ export async function alloggiati(req, env, p, m) {
       // pagina del telefono con la versione vecchia: se l'ID appartamento è 0 o vuoto e ce n'è uno solo, lo prendo dalla tabella salvata
       let righe = b.righe;
       if (righe[0].length === 174 && !(parseInt(righe[0].slice(168), 10) > 0)) {
-        const ids = idAppartamenti(await env.PX.get("aw_tab_app"));
-        if (ids.length !== 1) return J({ error: "schedine", detail: ids.length ? "Hai più appartamenti: scegli quale nel menu." : "Nessun appartamento nella tabella: premi «aggiorna tabelle»." }, 400);
+        let ids = idAppartamenti(await env.PX.get("aw_tab_app"));
+        if (!ids.length) { // tabella mai scaricata o vuota: la chiedo adesso al portale
+          const csv = await tabella(c, "ListaAppartamenti");
+          ids = idAppartamenti(csv);
+          if (ids.length) await env.PX.put("aw_tab_app", csv);
+        }
+        if (ids.length !== 1) return J({ error: "schedine", detail: ids.length ? "Hai più appartamenti: scegli quale nel menu." : "Il portale non mostra nessun appartamento attivo: controllalo in Gestione Appartamenti sul portale." }, 400);
         righe = righe.map((r) => r.slice(0, 168) + String(ids[0]).padEnd(6, " "));
       }
       const r = await schedine(c, righe, p === "invia" ? "Send" : "Test");
