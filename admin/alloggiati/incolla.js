@@ -62,7 +62,7 @@ function trovaEtichette(t) {
 }
 
 var PARTICELLE = /^(DI|DA|DE|DEL|DELLA|LA|LE|EL|AL|DU|DES|VAN|VON|DER|DEN|TEN|O|MC|MAC|ST|SAINT)$/i;
-/* tolta la sporcizia che l'OCR mette ai lati di un valore («MAFFRE % E ve» → «MAFFRE»): simboli e pezzetti di 1-2 lettere minuscole */
+/* tolta la sporcizia che l'OCR mette ai lati di un valore («DUPONT % E ve» → «DUPONT»): simboli e pezzetti di 1-2 lettere minuscole */
 function pulisciValore(r) {
   var tk = String(r || "").replace(/[_|=~*<>\\^"“”«»¦§]+/g, " ").split(/\s+/).filter(Boolean);
   var brutto = function (w) { return !/[A-Za-z0-9À-ÿ]/.test(w) || (/^[A-Za-zÀ-ÿ]{1,2}[.,;:]?$/.test(w) && (/^[a-zà-ÿ]/.test(w) || w.replace(/[.,;:]/g, "").length === 1) && !PARTICELLE.test(w.replace(/[.,;:]/g, ""))); };
@@ -85,7 +85,9 @@ function valoreDi(t, da, a) {
 function sessoDa(v) { var s = norm(v).split(" ")[0] || ""; if (/^(M|MASCHIO|MALE|MASC|H|HOMBRE|HOMME|MANN|MANNLICH)$/.test(s)) return "M"; if (/^(F|FEMMINA|FEMALE|FEM|W|MUJER|FEMME|FRAU|WEIBLICH)$/.test(s)) return "F"; return ""; }
 
 function luogoDa(v, r) {
-  var s = String(v || "").trim(); if (!s) return;
+  var s = String(v || "").trim().replace(/[\s,]+\d[\d\s.\/\-]*$/, "").trim(); if (!s) return; // pezzi di data rimasti in coda («LENINGRADO SUN 31 01»)
+  var e3 = /^(.*?[A-Za-z]{2}.*?)[\s,]+([A-Z]{3})$/.exec(s); // «LENINGRADO SUN»: le parentesi perse dall'OCR, resta il codice del paese
+  if (e3 && (MRZ && MRZ.PAESI && MRZ.PAESI[e3[2]] || /^(SUN|YUG|CSK|DDR)$/.test(e3[2])) && !/^(ROMA|NAPOLI)$/.test(e3[2])) { r.luogo_nascita = norm(e3[1]); r.stato_nascita = e3[2]; return; }
   var m = /^(.*?)[\s,]*[(\[{]\s*([A-Za-z0-9]{2})\s*[)\]}]\s*$/.exec(s);
   if (m && /^[A-Za-z]{2}$/.test(m[2].replace(/1/g, "I").replace(/0/g, "O").replace(/5/g, "S").replace(/8/g, "B"))) { // l'OCR legge «(SI)» come «{S1)»
     r.comune_nascita = norm(m[1]); r.provincia_nascita = m[2].replace(/1/g, "I").replace(/0/g, "O").replace(/5/g, "S").replace(/8/g, "B").toUpperCase(); return; }
@@ -528,6 +530,29 @@ function leggi1(testo, opz) {
   var P = [];
   blocchi(t).forEach(function (b) { P = P.concat(leggiBlocco(b)); });
   P = raggruppa(P);
+  if (P.length <= 1 && !OPZ.senzaAncore) { // lettura ad ancore: completa e corregge ciò che le etichette esatte non hanno dato
+    var an = ancore(t), q = P[0], nucleoA = ["cognome", "nome", "data_nascita", "sesso", "citt", "numero"].filter(function (k) { return an[k]; }).length;
+    if (!q && nucleoA >= 3) { q = { pulizia: [], euristico: [] }; P.push(q); }
+    if (q) uniscianc(q, an);
+  }
+  var italiano_ = /REPUBBLICA\s+ITALIANA|MINISTERO\s+DELL|CARTA\s+DI\s+IDENTIT/i.test(sa(t));
+  P.forEach(function (p) {
+    if (italiano_ && p.numero_documento && !p.mrz) { var nc = String(p.numero_documento).toUpperCase().replace(/[^A-Z0-9]/g, ""), fx = "";
+      if (nc.length === 9) fx = fixCie(nc);
+      else if (nc.length === 10) for (var z = 2; z < 10 && !fx; z++) fx = fixCie(nc.slice(0, z) + nc.slice(z + 1)) && /^C[A-Z]/.test(nc) ? fixCie(nc.slice(0, z) + nc.slice(z + 1)) : ""; // un carattere in più letto dall'OCR
+      if (fx && fx !== nc) { p.numero_documento = fx; (p.euristico = p.euristico || []).push("numero_documento"); } }
+    if (p.cittadinanza && !/^[A-Z]{3}$/.test(p.cittadinanza)) { var cc = codicePaese(p.cittadinanza); if (cc) p.cittadinanza = cc; }
+    ["comune_nascita", "luogo_nascita", "rilascio_comune"].forEach(function (k) { // «F», «27 ME», «LIEW DE NAISSANCE», «APL AWCIPALITY» non sono luoghi
+      if (!p[k]) return; var lv = String(p[k]).trim().replace(/^(?:[A-Z]{1,2}\s+)+(?=[A-Z]{3,})/, function (m0) { return /^(LA|LE|LO|IL|EL|AL|SAN|ST|DE|DI|DEL)\s/.test(m0) ? m0 : ""; });
+      var paro = lv.split(/\s+/), brutte = paro.filter(function (w) { return w.length <= 2 && !PARTICELLE.test(w) && !/^(LA|LE|LO|IL|EL|AL|SAN|ST|DE|DI|DEL|SUL|SUR|AM|AN|IN|AU|AUX)$/.test(w); }).length;
+      if (lv.replace(/[^A-Za-z]/g, "").length < 2 || /^[MF]$/i.test(lv) || /^\d/.test(lv) || paro.some(parolaEtichetta) || /PALITY|CIPAL|MUNI[CG]|NAISS|BIRTH|NASCIT/i.test(lv) || (paro.length >= 3 && brutte >= 2)) { p[k] = ""; if (k === "comune_nascita") p.provincia_nascita = ""; }
+      else p[k] = lv;
+    });
+    if (p.data_nascita) { var an2 = +p.data_nascita.slice(-4); if (an2 < 1900 || an2 > new Date().getFullYear()) { p.data_nascita = ""; } } // «ITALIANA», «BRITISH CITIZEN», «EIREANNACH/IRISH» → codice
+    if (p.rilascio_testo && !p.rilascio_comune && !p.rilascio_stato) { var rt = norm(p.rilascio_testo); if (/^[A-Z]{3}$/.test(rt) && MRZ && MRZ.PAESI && MRZ.PAESI[rt]) p.rilascio_stato = MRZ.PAESI[rt]; else if (/\bMIT\b|\bUCO\b|MOTORIZZAZIONE/.test(rt)) p.rilascio_comune = "ROMA"; }
+    if (!p.rilascio_comune && !p.rilascio_stato && p.tipo_documento === "PASOR" && /^[A-Z]{3}$/.test(p.cittadinanza || "") && p.cittadinanza !== "ITA" && MRZ && MRZ.PAESI && MRZ.PAESI[p.cittadinanza]) { p.rilascio_stato = MRZ.PAESI[p.cittadinanza]; (p.euristico = p.euristico || []).push("rilascio"); } // il passaporto lo rilascia il paese di cui si è cittadini: da controllare
+  });
+  P.forEach(function (p) { if (p.tipo_documento === "PATEN" && p.rilascio_testo && !p.rilascio_comune) { var mc = /\b(?:U?MC|M\.?C\.?)\s*[-–]?\s*([A-Z]{2})\b/.exec(norm(p.rilascio_testo)); if (mc && CAPOLUOGO[mc[1]]) p.rilascio_comune = CAPOLUOGO[mc[1]]; } });
   P.forEach(function (p) {
     p.dubbi = [].concat(p.differenze || []).map(function (d) { return { "data di nascita": "data_nascita", "numero del documento": "numero_documento" }[d] || d; });
     p.avvisi = (p.pulizia || []).slice(); if (p.numero_corretto) p.dubbi.push("numero_documento");
@@ -550,10 +575,29 @@ function leggi1(testo, opz) {
 }
 
 
+/* quanto è credibile un valore letto: un numero di carta italiana col formato giusto pesa più di uno storpiato */
+function validita(k, v, p) {
+  var x = String(v || "").toUpperCase();
+  if (k === "numero_documento") { if (/^C[A-Z]\d{5}[A-Z]{2}$/.test(x)) return 3; if (numeroOk(x)) return 1; return 0.2; }
+  if (k === "cognome" || k === "nome") { if (!nomeOk(x)) return 0.1; if (/^[A-Z]{3}$/.test(x) && MRZ && MRZ.PAESI && MRZ.PAESI[x]) return 0.2; return x.replace(/[^A-Z]/g, "").length >= 3 ? 1 : 0.4; }
+  if (k === "data_nascita") { var an_ = +String(x).slice(-4); return dataNorm(x) && an_ >= 1900 && an_ <= new Date().getFullYear() ? 1 : 0; }
+  if (k === "comune_nascita") return x.replace(/[^A-Z]/g, "").length >= 3 && !/\d/.test(x) ? (p && p.provincia_nascita ? 1.5 : 1) : 0.2;
+  if (k === "rilascio_comune") return x.replace(/[^A-Z]/g, "").length >= 3 && !/\d/.test(x) ? 1 : 0.1;
+  return 1;
+}
+function simili(k, a, b) {
+  if (a === b) return true;
+  if (!/^(cognome|nome|comune_nascita|luogo_nascita|rilascio_comune|numero_documento)$/.test(k)) return false;
+  var x = a.replace(/[^A-Z0-9 ]/g, ""), y = b.replace(/[^A-Z0-9 ]/g, "");
+  if ((k === "nome" || k === "cognome") && Math.min(x.length, y.length) >= 4 && (x.indexOf(y) === 0 || y.indexOf(x) === 0)) return true; // uno è l'altro troncato o con una coda
+  var lim = Math.max(1, Math.round(Math.max(x.length, y.length) * 0.2));
+  return Math.abs(x.length - y.length) <= lim && dist(x, y) <= lim;
+}
+
 /* Più letture della stessa foto (immagine intera, a fasce, canali di colore diversi, ruotata…): ogni lettura sbaglia in un punto diverso.
    Raggruppa le persone che sono la stessa (stesso cognome, data o numero) e per ogni campo vince il valore che compare più volte,
    pesato su quanto è completa la lettura da cui viene. I campi su cui le letture non sono d'accordo restano "da controllare". */
-var CAMPI_U = ["cognome", "nome", "sesso", "data_nascita", "comune_nascita", "provincia_nascita", "luogo_nascita", "stato_nascita", "cittadinanza", "numero_documento", "tipo_documento", "codice_fiscale"];
+var CAMPI_U = ["cognome", "nome", "sesso", "data_nascita", "comune_nascita", "provincia_nascita", "luogo_nascita", "stato_nascita", "cittadinanza", "numero_documento", "tipo_documento", "codice_fiscale", "rilascio_comune", "rilascio_stato"];
 function unisci(testi, opz) {
   var cand = [];
   (testi || []).forEach(function (t, i) {
@@ -577,26 +621,299 @@ function unisci(testi, opz) {
     for (var gj = 0; gj < gi; gj++) { var gr = gruppi[gj], a1 = gr[0].p, b1 = piccolo[0].p;
       if (gr.length > piccolo.length && a1.cognome && b1.cognome && (norm(a1.cognome) === norm(b1.cognome) || (Math.min(a1.cognome.length, b1.cognome.length) >= 5 && lev(norm(a1.cognome), norm(b1.cognome)) <= 2))) { gruppi[gj] = gr.concat(piccolo); gruppi.splice(gi, 1); break; } }
   }
+  var nucleo = function (p) { return ["cognome", "nome", "data_nascita", "sesso", "cittadinanza", "numero_documento"].filter(function (k) { return p[k]; }).length; };
   var out = [], note = [];
   var M = gruppi.length ? gruppi[0][0].n : 0;
   gruppi.filter(function (g) { return g[0].n >= Math.max(4, M - 2) && (g.length >= 2 || g[0].n >= 5 || gruppi.length === 1); }).forEach(function (g) {
     var base = JSON.parse(JSON.stringify(g[0].p)), voti, dis = [];
     CAMPI_U.forEach(function (k) {
-      voti = {}; g.forEach(function (c) { var v = c.p[k]; if (v) { var kk = String(v).toUpperCase(); voti[kk] = voti[kk] || { v: v, w: 0, c: 0 }; voti[kk].w += c.n * c.n; voti[kk].c++; } });
-      var ks = Object.keys(voti).sort(function (a, b) { return voti[b].w - voti[a].w; });
-      if (!ks.length) return;
+      voti = {}; g.forEach(function (c) { var v = c.p[k]; if (v) { var kk = String(v).toUpperCase(); voti[kk] = voti[kk] || { v: v, w: 0, c: 0 }; voti[kk].w += c.n * c.n * validita(k, v, c.p); voti[kk].c++; } });
+      // valori quasi uguali (una lettera storpiata, un nome troncato) votano insieme
+      var vk = Object.keys(voti), gr = [];
+      vk.forEach(function (a) { var x = gr.filter(function (G) { return simili(k, G[0], a); })[0]; if (x) x.push(a); else gr.push([a]); });
+      gr = gr.map(function (G) { var w = 0, c = 0; G.forEach(function (a) { w += voti[a].w; c += voti[a].c; }); var rap = G.slice().sort(function (a, b) { return (voti[b].w - voti[a].w) || (b.length - a.length); })[0];
+        if (k === "nome" || k === "cognome") { // «GIAN MARC» → «GIAN MARCO»: si allunga solo completando l'ultima parola, mai aggiungendone (in coda di solito c'è rumore)
+          var completa = G.filter(function (b) { return b !== rap && b.indexOf(rap) === 0 && b.split(" ").length === rap.split(" ").length && voti[b].c >= 1; }).sort(function (a, b) { return voti[b].w - voti[a].w; })[0];
+          if (completa && rap.split(" ").pop().length >= 3) rap = completa;
+          var corto = G.filter(function (b) { return b !== rap && rap.indexOf(b + " ") === 0; }).sort(function (a, b) { return voti[b].w - voti[a].w; })[0];
+          if (corto && voti[corto].w >= voti[rap].w * 0.5) rap = corto; } // «ROSSI HF WEY» contro «ROSSI»: vince quello senza la coda
+        if (k === "numero_documento") { var buono = G.filter(function (a) { return /^C[A-Z]\d{5}[A-Z]{2}$/.test(a); }).sort(function (a, b) { return voti[b].w - voti[a].w; })[0]; if (buono) rap = buono; } // tra numeri simili vince quello col formato giusto
+        return { rap: rap, w: w, c: c }; }).sort(function (a, b) { return b.w - a.w; });
+      if (!gr.length || gr[0].w <= 0) return;
+      var ks = gr.map(function (x) { return x.rap; }); voti = {}; gr.forEach(function (x) { voti[x.rap] = { v: x.rap, w: x.w, c: x.c }; });
       base[k] = voti[ks[0]].v;
       if (ks.length > 1 && voti[ks[0]].w < 2.5 * voti[ks[1]].w) dis.push(k); // letture in disaccordo
       else if (ks.length === 1 && voti[ks[0]].c >= 2 && base.dubbi) base.dubbi = base.dubbi.filter(function (d) { return d !== k || /^(numero_documento|data_nascita)$/.test(k) && base.mrz; }); // più letture indipendenti concordi
     });
     base.dubbi = (base.dubbi || []).slice(); base.avvisi = (base.avvisi || []).slice();
     dis.forEach(function (k) { if (base.dubbi.indexOf(k) < 0) base.dubbi.push(k); base.avvisi.push("Le letture della foto non sono d'accordo su «" + k.replace(/_/g, " ") + "»: controllalo."); });
-    base.lette = g.length; out.push(base);
+    base.lette = g.length; if (base.mrz || nucleo(base) >= 3) out.push(base); // meno di tre campi veri: è rumore, non una persona
   });
   if (out.length) note.push("Unite " + cand.length + " letture della stessa foto.");
   return { persone: out, note: note };
 }
 
-var api = { unisci: unisci, leggi1: leggi1, riempiti: riempiti, largo: largo, ripara: ripara, euristica: euristica, dividi: dividi, correggiNumero: correggiNumero, blocchi: blocchi, raggruppa: raggruppa, mrzTutte: mrzTutte, cfValido: cfValido, cfControlla: cfControlla, leggi: leggi, persone: persone, confronta: confronta, dataNorm: dataNorm, tipoDocDa: tipoDocDa, sessoDa: sessoDa };
+/* ===================== LETTURA AD ANCORE =====================
+   Come ragiona una persona davanti a un documento fotografato male:
+   1) trova l'etichetta di ogni campo anche se l'OCR l'ha storpiata («SUBNAME», «NASOTR», «SéSSO», «COOTTADINANZA»);
+   2) prende il primo valore vicino che ha la FORMA giusta per quel campo (una data, M/F, un codice di paese, un nome),
+      saltando righe spazzatura e altre etichette; se sotto non c'è, guarda subito sopra (impaginazioni col valore sopra);
+   3) se un'etichetta manca del tutto, riconosce i valori dalla forma: «MELFI (PZ) 03.11.1968» è luogo e data di nascita,
+      «CA57204KD» è il numero di una carta italiana, «M 170 ITA» è sesso-statura-cittadinanza;
+   4) dall'intestazione capisce il paese del documento («REPUBBLICA ITALIANA», «UNITED KINGDOM», «REINO DE ESPAÑA»…).
+   Restituisce anche, per ogni campo, da dove viene il valore («ancora» o «forma»): quelli trovati solo per forma vanno controllati. */
+var VOC = {
+  luogodata: ["LUOGO E DATA DI NASCITA", "PLACE AND DATE OF BIRTH", "LIEU ET DATE DE NAISSANCE", "LUGAR Y FECHA DE NACIMIENTO", "GEBURTSORT UND DATUM", "LOCAL E DATA DE NASCIMENTO"],
+  cognome: ["COGNOME", "SURNAME", "LAST NAME", "FAMILY NAME", "NOM DE FAMILLE", "APELLIDOS", "APELLIDO", "NACHNAME", "FAMILIENNAME", "PRIEZVISKO", "PRIJMENI", "NAZWISKO", "ACHTERNAAM", "EFTERNAMN", "ETTERNAVN", "EFTERNAVN", "SOYADI", "APELIDOS", "APELIDO", "SOBRENOME", "NUME", "NOM", "SLOINNE", "EPONYMO", "PRIIMEK", "PREZIME", "VEZETEKNEV", "PAVARDE", "UZVARDS", "PEREKONNANIMI", "SUKUNIMI", "COGNOMI"],
+  nome: ["NOME", "NAME", "GIVEN NAMES", "GIVEN NAME", "FORENAMES", "FORENAME", "FIRST NAMES", "FIRST NAME", "PRENOMS", "PRENOM", "NOMBRE", "NOMBRES", "VORNAMEN", "VORNAME", "MENO", "JMENO", "IMIONA", "IMIE", "VOORNAMEN", "FORNAMN", "FORNAVN", "PRENUME", "ADI", "TUSAINM", "ONOMA", "IME", "UTONEV", "VARDAS", "VARDS", "EESNIMED", "ETUNIMET", "OTHER NAMES", "CHRISTIAN NAMES", "PRENOMI"],
+  nascita: ["DATA DI NASCITA", "DATE OF BIRTH", "BIRTH DATE", "DATE DE NAISSANCE", "DATE DE NAISS", "FECHA DE NACIMIENTO", "FECHA NACIMIENTO", "NACIMIENTO", "GEBURTSDATUM", "DATUM NARODENIA", "DATUM NAROZENI", "DATA URODZENIA", "GEBOORTEDATUM", "DATA DE NASCIMENTO", "FODELSEDATUM", "FODSELSDATO", "DOGUM TARIHI", "DATA NASTERII", "DATA BREITHE", "DATUM ROJSTVA", "DATUM RODENJA", "SZULETESI IDO", "SYNTYMAAIKA", "DATE NAISS", "DOB", "BIRTHDAY", "NATO IL", "NATA IL"],
+  luogo: ["LUOGO DI NASCITA", "PLACE OF BIRTH", "BIRTHPLACE", "BIRTH PLACE", "LIEU DE NAISSANCE", "LIEU DE NAISS", "LUGAR DE NACIMIENTO", "GEBURTSORT", "MIESTO NARODENIA", "MISTO NAROZENI", "MIEJSCE URODZENIA", "GEBOORTEPLAATS", "LOCAL DE NASCIMENTO", "FODELSEORT", "FODESTED", "DOGUM YERI", "LOCUL NASTERII", "AIT BHREITHE", "KRAJ ROJSTVA", "MJESTO RODENJA", "SZULETESI HELY", "SYNTYMAPAIKKA", "COMUNE DI NASCITA", "NATO A", "NATA A"],
+  sesso: ["SESSO", "SEX", "SEXE", "SEXO", "GESCHLECHT", "GENDER", "POHLAVIE", "POHLAVI", "PLEC", "GESLACHT", "KON", "KJONN", "KOEN", "CINSIYET", "GNEAS", "FYLO", "SPOL", "NEM", "SUKUPUOLI"],
+  citt: ["CITTADINANZA", "NATIONALITY", "NATIONALITE", "NACIONALIDAD", "STAATSANGEHORIGKEIT", "STATNA PRISLUSNOST", "STATNI PRISLUSNOST", "OBYWATELSTWO", "NATIONALITEIT", "NACIONALIDADE", "NATIONALITET", "UYRUGU", "CETATENIE", "NAISIUNTACHT", "CITIZENSHIP", "NAZIONALITA", "ITHAGENEIA", "DRZAVLJANSTVO", "ALLAMPOLGARSAG", "PILIETYBE", "PILSONIBA", "KODAKONSUS", "KANSALAISUUS", "CITTADINANZA ITALIANA"],
+  numero: ["DOCUMENT NO", "DOCUMENT NUMBER", "PASSPORT NO", "PASSPORT NUMBER", "PASSEPORT NO", "CARD NO", "CARD NUMBER", "ID NO", "ID NUMBER", "NO DU DOCUMENT", "N DU DOCUMENT", "NUMERO DU DOCUMENT", "NUMERO DOCUMENTO", "NUMERO DEL DOCUMENTO", "NUM SOPORTE", "NUMERO DE SOPORTE", "NUMERO DE DOCUMENTO", "DOKUMENTNUMMER", "AUSWEISNUMMER", "PASSNUMMER", "PASS NR", "PAS UIMHIR", "NUMER DOKUMENTU", "CISLO DOKLADU", "CISLO PASU", "DOCUMENTNUMMER", "NUMERO PASSAPORTO", "PASSAPORTO N", "NUMERO CARTA"],
+  rilascio: ["COMUNE DI", "MUNICIPALITY", "AUTHORITY", "AUTORITE", "ISSUING AUTHORITY", "PLACE OF ISSUE", "LIEU DE DELIVRANCE", "EXPEDIDO EN", "AUTORIDAD", "AUSSTELLENDE BEHORDE", "BEHORDE", "UDARAS", "RILASCIATA DA", "RILASCIATO DA", "RILASCIATA DAL", "ISSUED BY", "ISSUED AT", "EMESSA DA", "EMESSO DA", "VYDAL", "VYDAVAJUCI ORGAN", "ORGAN WYDAJACY", "LUOGO DI RILASCIO", "COMUNE DI RILASCIO"],
+  ignoradata: ["EMISSIONE", "ISSUING", "DATE OF ISSUE", "ISSUE DATE", "DATE DE DELIVRANCE", "FECHA DE EXPEDICION", "EMISION", "EXPEDICION", "AUSSTELLUNGSDATUM", "DATUM VYDANIA", "DATA WYDANIA", "SCADENZA", "EXPIRY", "DATE OF EXPIRY", "EXPIRY DATE", "DATE D EXPIRATION", "DATE D EXPIR", "DATE OF EXPIRATION", "VALIDEZ", "VALIDITE", "GULTIG BIS", "PLATNOST DO", "WAZNY DO", "GELDIG TOT", "VALIDADE", "TERMIN WAZNOSCI", "VALABILITATE", "GILTIG T O M", "VRIJEDI DO", "FECHA DE CADUCIDAD", "DATE OF EXPIRATION"],
+  ignora: ["COGNOME E NOME DEL PADRE E DELLA MADRE", "FATHER AND MOTHER S TUTOR S NAME", "DEL PADRE E DELLA MADRE", "INDIRIZZO DI RESIDENZA", "STATURA", "HEIGHT", "TAILLE", "ALTURA", "GROSSE", "KORPERGROSSE", "FIRMA DEL TITOLARE", "HOLDERS SIGNATURE", "HOLDER S SIGNATURE", "SIGNATURE", "SIGNATURE DU TITULAIRE", "FIRMA", "UNTERSCHRIFT", "TYPE", "CODE", "CODICE FISCALE", "FISCAL CODE", "RESIDENZA", "RESIDENCE", "INDIRIZZO DI RESIDENZA", "ESTREMI ATTO DI NASCITA", "PERSONAL NO", "PERSONAL NUMBER", "NATIONAL ID", "TIPO", "KOD", "COLORE DEGLI OCCHI", "AUGENFARBE", "EYES", "DATA BREITHE"],
+  testata: ["REPUBBLICA ITALIANA", "MINISTERO DELL INTERNO", "CARTA DI IDENTITA", "IDENTITY CARD", "PASSAPORTO", "PASSPORT", "PASSEPORT", "PATENTE DI GUIDA", "DRIVING LICENCE", "UNITED KINGDOM OF GREAT BRITAIN AND NORTHERN IRELAND", "REPUBLIQUE FRANCAISE", "CARTE NATIONALE D IDENTITE", "REINO DE ESPANA", "DOCUMENTO NACIONAL DE IDENTIDAD", "BUNDESREPUBLIK DEUTSCHLAND", "PERSONALAUSWEIS", "REISEPASS", "IDENTITEITSKAART", "PASAPORTE", "THIS PAGE IS RESERVED FOR OFFICIAL OBSERVATIONS", "EUROPEAN UNION", "UNIONE EUROPEA"]
+};
+var ANC = []; // [{k, t:[token…], n:lettere}]
+Object.keys(VOC).forEach(function (k) { VOC[k].forEach(function (f) { var t = f.split(" "); ANC.push({ k: k, t: t, n: t.join("").length }); }); });
+ANC.sort(function (a, b) { return b.n - a.n; }); // le frasi più lunghe prima (LUOGO E DATA DI NASCITA prima di DATA DI NASCITA)
+
+function tokRiga(r) { // token con posizione nel testo originale
+  var s = sa(r).toUpperCase(), out = [], re = /[A-Z0-9]+/g, m;
+  while ((m = re.exec(s))) out.push({ w: m[0], i: m.index, f: m.index + m[0].length });
+  return out;
+}
+function tokUguale(a, b) { // a = token dell'etichetta, b = token letto
+  if (a === b) return true;
+  if (a.length <= 4) return false; // etichette corte (NOME, NAME, NUME, IMIE, SEX): solo uguali, sennò «MIE» diventa «IMIE»
+  var lim = a.length <= 6 ? 1 : a.length <= 9 ? 2 : 3;
+  if (Math.abs(a.length - b.length) > lim) return false;
+  var b2 = b.replace(/0/g, "O").replace(/1/g, "I").replace(/5/g, "S").replace(/8/g, "B");
+  return dist(a, b2) <= lim;
+}
+/* etichette in una riga: [{k, da, a (indici token), i, f (caratteri)}], le più lunghe vincono */
+function ancoreRiga(tk) {
+  var usati = [], out = [];
+  [0, 1].forEach(function (giro) { // prima le etichette lette giuste per intero, poi quelle con una parola storpiata («DATE OF BIRTH» non deve diventare «DATE OF ISSUE»)
+  ANC.forEach(function (an) {
+    var n = an.t.length;
+    for (var j = 0; j + n <= tk.length; j++) {
+      var ok = 0, x;
+      for (x = 0; x < n; x++) { if (usati[j + x]) break; if (tokUguale(an.t[x], tk[j + x].w)) ok++; }
+      if (x < n) continue;
+      var serve = giro === 1 && n >= 3 ? n - 1 : n; // nelle frasi lunghe una parola può essere illeggibile
+      if (ok < serve) continue;
+      if (n >= 3 && (!tokUguale(an.t[0], tk[j].w) && !tokUguale(an.t[n - 1], tk[j + n - 1].w))) continue;
+      for (x = 0; x < n; x++) usati[j + x] = true;
+      out.push({ k: an.k, da: j, a: j + n, i: tk[j].i, f: tk[j + n - 1].f });
+    }
+  });
+  });
+  // frase lunga troncata dall'OCR all'inizio: «(OGO E DATA Di NASOTR» → «… DATA DI NASCITA» dentro «LUOGO E DATA DI NASCITA»
+  out.sort(function (a, b) { return a.i - b.i; });
+  return out;
+}
+function riga_spazzatura(r) {
+  var s = sa(r).trim(); if (!s) return true;
+  var lettere = (s.match(/[A-Za-z]/g) || []).length, cifre = (s.match(/[0-9]/g) || []).length;
+  if (lettere + cifre < 2) return true;
+  if (/^\d{1,2}[:.]\d{2}\b/.test(s) && lettere < 3) return true; // ora dello screenshot «02:12»
+  if (!cifre && !/[A-Z]/.test(s)) return true; // «eco», «leri», «ae»: solo minuscole sparse
+  if (!cifre && lettere <= 2) return true;
+  return false;
+}
+var NAZ = { ITALIANA: "ITA", ITALIANO: "ITA", ITALIAN: "ITA", BRITISH: "GBR", IRISH: "IRL", EIREANNACH: "IRL", FRANCAISE: "FRA", FRANCAIS: "FRA", FRENCH: "FRA", ESPANOLA: "ESP", ESPANOL: "ESP", SPANISH: "ESP", DEUTSCH: "DEU", GERMAN: "DEU", OSTERREICH: "AUT", AUSTRIAN: "AUT", SUISSE: "CHE", SWISS: "CHE", BELGE: "BEL", BELGIAN: "BEL", NEDERLANDSE: "NLD", DUTCH: "NLD", PORTUGUESA: "PRT", PORTUGUESE: "PRT", POLSKIE: "POL", POLISH: "POL", ROMANA: "ROU", ROMANIAN: "ROU", AMERICAN: "USA", CANADIAN: "CAN", AUSTRALIAN: "AUS", SLOVENSKA: "SVK", SLOVAK: "SVK", CESKA: "CZE", CZECH: "CZE", HELLENIC: "GRC", GREEK: "GRC", SVENSK: "SWE", SWEDISH: "SWE", DANSK: "DNK", DANISH: "DNK", NORSK: "NOR", NORWEGIAN: "NOR", SUOMI: "FIN", FINNISH: "FIN", MAGYAR: "HUN", HUNGARIAN: "HUN", HRVATSKO: "HRV", CROATIAN: "HRV", UKRAINIAN: "UKR", RUSSIAN: "RUS", ALBANIAN: "ALB", BRAZILIAN: "BRA", BRASILEIRA: "BRA", ARGENTINA: "ARG", MEXICANA: "MEX", CHINESE: "CHN", JAPANESE: "JPN", INDIAN: "IND", MOROCCAN: "MAR", TURKISH: "TUR", ISRAELI: "ISR" };
+var TESTATE = [[/REPUBBLICA\s+ITALIANA|MINISTERO\s+DELL.?\s*INTERNO|PATENTE\s+DI\s+GUIDA/, "ITA"], [/UNITED\s+KINGDOM|GREAT\s+BRITAIN|NORTHERN\s+IRELAND/, "GBR"], [/\bEIRE\b|\bIRELAND\b|IRLANDE/, "IRL"], [/REPUBLIQUE\s+FRAN|CARTE\s+NATIONALE\s+D/, "FRA"], [/REINO\s+DE\s+ESPA|DOCUMENTO\s+NACIONAL\s+DE\s+IDENTIDAD/, "ESP"], [/REPUBLIK\s+OSTERREICH/, "AUT"], [/BUNDESREPUBLIK\s+DEUTSCHLAND/, "DEU"], [/SCHWEIZ|CONFEDERATION\s+SUISSE|SVIZZERA/, "CHE"], [/KONINKRIJK\s+DER\s+NEDERLANDEN|NEDERLAND/, "NLD"], [/BELGIQUE|BELGIE|KINGDOM\s+OF\s+BELGIUM/, "BEL"], [/REPUBLICA\s+PORTUGUESA/, "PRT"], [/RZECZPOSPOLITA\s+POLSKA/, "POL"], [/ROMANIA/, "ROU"], [/SLOVENSKA\s+REPUBLIKA/, "SVK"], [/CESKA\s+REPUBLIKA/, "CZE"], [/UNITED\s+STATES\s+OF\s+AMERICA/, "USA"], [/CANADA/, "CAN"], [/AUSTRALIA/, "AUS"], [/HELLENIC\s+REPUBLIC|ELLINIKI/, "GRC"], [/SVERIGE|SWEDEN/, "SWE"], [/DANMARK|DENMARK/, "DNK"], [/NORGE|NORWAY/, "NOR"], [/SUOMI|FINLAND/, "FIN"], [/MAGYARORSZAG|HUNGARY/, "HUN"], [/REPUBLIKA\s+HRVATSKA/, "HRV"], [/UKRAINE|UKRAINA/, "UKR"], [/REPUBLICA\s+FEDERATIVA\s+DO\s+BRASIL/, "BRA"]];
+function paeseDoc(t) { var s = sa(t).toUpperCase(); for (var i = 0; i < TESTATE.length; i++) if (TESTATE[i][0].test(s)) return TESTATE[i][1]; return ""; }
+function codicePaese(v) { // «ITA», «BRITISH CITIZEN», «EIREANNACH/IRISH», «FRA» → codice a 3 lettere
+  var s = sa(v).toUpperCase().replace(/[^A-Z ]+/g, " ").trim(); if (!s) return "";
+  var w = s.split(/\s+/);
+  for (var i = 0; i < w.length; i++) { var x = w[i].replace(/0/g, "O"); if (x.length === 3 && MRZ && MRZ.PAESI && MRZ.PAESI[x]) return x; }
+  for (i = 0; i < w.length; i++) if (NAZ[w[i]]) return NAZ[w[i]];
+  for (i = 0; i < w.length; i++) for (var n in NAZ) if (w[i].length >= 5 && dist(w[i], n) <= 1) return NAZ[n];
+  return "";
+}
+function nomeAncora(v) { // valore che sembra un nome: lettere (anche minuscole Alain,Jean-Claude), niente cifre, niente etichette
+  var x = sa(pulisciValore(v)).replace(/\s*,\s*/g, " ").replace(/[«»"“”`´’]/g, "'").trim();
+  x = x.split(/\s+/).filter(function (w) { return !/^[CEGKLSIO<]{6,}$/i.test(w); }).join(" "); // riempitivo MRZ letto «cccc»
+  var tw = x.split(/\s+/); while (tw.length > 1 && /^[A-Za-z]{1,2}$/.test(tw[tw.length - 1]) && !PARTICELLE.test(tw[tw.length - 1]) && tw.slice(0, -1).some(function (w) { return w.length >= 3; })) tw.pop(); x = tw.join(" "); // «ROSSI FF», «MARIO Z»
+  if (!x || /\d/.test(x)) return "";
+  if (!/^[A-Za-z' .\-]{2,45}$/.test(x)) return "";
+  var lett = (x.match(/[A-Za-z]/g) || []).length, maiu = (x.match(/[A-Z]/g) || []).length;
+  if (lett < 2) return "";
+  if (maiu / lett < 0.5 && !/^([A-Z][a-z'\-]*[A-Za-z'\-]*[ \-]?)+$/.test(x.replace(/\s+/g, " "))) return ""; // «leri», «eco»: rumore minuscolo
+  var tk = tokRiga(x); if (ancoreRiga(tk).length) return ""; // è un'etichetta
+  if (tk.some(function (w) { return /^(REPUBLIC|REPUBBLICA|REPUBLIQUE|REPUBLICA|REPUBLIK|BUNDESREPUBLIK|KINGDOM|REGNO|REINO|ROYAUME|KONINKRIJK|CARD|CARTA|CARTE|TARJETA|KARTE|PASSPORT|PASSAPORTO|PASSEPORT|PASAPORTE|REISEPASS|PERMIT|LICENCE|LICENSE|PATENTE|MINISTERO|MINISTRY|DOCUMENT|DOCUMENTO|IDENTITY|IDENTITA|IDENTITE|IDENTIDAD|NATIONAL|NAZIONALE|NACIONAL|UNION|EUROPEA|EUROPEAN|STATE|STATES|ESTADO|MUNICIPALITY|COMUNE)$/.test(w.w); })) return ""; // intestazioni del documento
+  if (sembraEtichetta(x)) return "";
+  if (/\b(PADRE|MADRE|FATHER|MOTHER|TUTOR|RESIDENZA|RESIDENCE|INDIRIZZO)\b/i.test(x)) return ""; // retro della carta: non è il titolare
+  return norm(x).replace(/\s+/g, " ");
+}
+var PAROLE_ET = []; Object.keys(VOC).forEach(function (k) { VOC[k].forEach(function (f) { f.split(" ").forEach(function (w) { if (w.length >= 5 && PAROLE_ET.indexOf(w) < 0) PAROLE_ET.push(w); }); }); });
+["COMUNE", "MUNICIPALITY", "IDENTITA", "IDENTITY", "MINISTERO", "INTERNO", "REPUBBLICA", "ITALIANA", "TITOLARE", "SIGNATURE"].forEach(function (w) { if (PAROLE_ET.indexOf(w) < 0) PAROLE_ET.push(w); });
+function parolaEtichetta(w) { w = sa(w).toUpperCase().replace(/[^A-Z0-9]/g, ""); if (w.length < 5) return false; return PAROLE_ET.some(function (e) { return tokUguale(e, w); }); }
+function luogoAncora(v) { var x = pulisciValore(v).replace(/[0-9]{1,2}[./\-][0-9]{1,2}[./\-][0-9]{2,4}.*$/, "").trim(); if (!x || !/[A-Za-z]{2}/.test(x) || /\d{2}/.test(x.replace(/[(\[{][^)\]}]*[)\]}]/g, ""))) return "";
+  if (x.split(/\s+/).some(parolaEtichetta) || /\b(COMUNE|CONUNE|COMUN|MUNICIP)/i.test(sa(x))) return ""; /* «COMUNE O1», «MOROCPALITY»: etichetta storpiata, non un luogo */ if (ancoreRiga(tokRiga(x)).length) return ""; return x; }
+function numeroAncora(v) {
+  var c = pulisciValore(v).toUpperCase().split(/\s+/).filter(function (w) { return !dataNorm(w); }).map(function (w) { return w.replace(/[^A-Z0-9]/g, ""); }).filter(function (w) { return w.length >= 6 && w.length <= 12 && /\d/.test(w); });
+  for (var i = 0; i < c.length; i++) { var n = c[i]; if (numeroOk(n) || /^[A-Z]{2}\d{5}[A-Z]{2}$/.test(n)) return n; }
+  return "";
+}
+var LUOGODATA = /([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ' .\-]{1,40}?)\s*[(\[{]\s*([A-Za-z0-9]{2,3})\s*[)\]}]\s*,?\s*(\d{1,2}\s*[.\/\-]\s*\d{1,2}\s*[.\/\-]\s*\d{2,4})/;
+var NUM_CIE = /\b(C[A-Z0-9][0-9OIlSBZ]{5}[A-Z0-9]{2})\b/;
+function fixCie(x) { // CA57204KD: 2 lettere, 5 cifre, 2 lettere — l'OCR scambia O/0, I/1, S/5, Z/2, B/8, G/6
+  var a = x.toUpperCase(), L = { 0: "O", 1: "I", 5: "S", 2: "Z", 8: "B", 6: "G", 4: "A", 7: "T" }, D = { O: "0", Q: "0", D: "0", I: "1", L: "1", S: "5", Z: "2", B: "8", G: "6", A: "4", T: "7" };
+  var r = a.slice(0, 2).replace(/[0-9]/g, function (c) { return L[c] || c; }) + a.slice(2, 7).replace(/[A-Z]/g, function (c) { return D[c] || c; }) + a.slice(7, 9).replace(/[0-9]/g, function (c) { return L[c] || c; });
+  return /^C[A-Z]\d{5}[A-Z]{2}$/.test(r) ? r : "";
+}
+var SIGLE_PROV = "AG:AGRIGENTO,AL:ALESSANDRIA,AN:ANCONA,AO:AOSTA,AP:ASCOLI PICENO,AQ:L'AQUILA,AR:AREZZO,AT:ASTI,AV:AVELLINO,BA:BARI,BG:BERGAMO,BI:BIELLA,BL:BELLUNO,BN:BENEVENTO,BO:BOLOGNA,BR:BRINDISI,BS:BRESCIA,BT:BARLETTA,BZ:BOLZANO,CA:CAGLIARI,CB:CAMPOBASSO,CE:CASERTA,CH:CHIETI,CL:CALTANISSETTA,CN:CUNEO,CO:COMO,CR:CREMONA,CS:COSENZA,CT:CATANIA,CZ:CATANZARO,EN:ENNA,FC:FORLI,FE:FERRARA,FG:FOGGIA,FI:FIRENZE,FM:FERMO,FR:FROSINONE,GE:GENOVA,GO:GORIZIA,GR:GROSSETO,IM:IMPERIA,IS:ISERNIA,KR:CROTONE,LC:LECCO,LE:LECCE,LI:LIVORNO,LO:LODI,LT:LATINA,LU:LUCCA,MB:MONZA,MC:MACERATA,ME:MESSINA,MI:MILANO,MN:MANTOVA,MO:MODENA,MS:MASSA,MT:MATERA,NA:NAPOLI,NO:NOVARA,NU:NUORO,OR:ORISTANO,PA:PALERMO,PC:PIACENZA,PD:PADOVA,PE:PESCARA,PG:PERUGIA,PI:PISA,PN:PORDENONE,PO:PRATO,PR:PARMA,PT:PISTOIA,PU:PESARO,PV:PAVIA,PZ:POTENZA,RA:RAVENNA,RC:REGGIO DI CALABRIA,RE:REGGIO NELL'EMILIA,RG:RAGUSA,RI:RIETI,RM:ROMA,RN:RIMINI,RO:ROVIGO,SA:SALERNO,SI:SIENA,SO:SONDRIO,SP:LA SPEZIA,SR:SIRACUSA,SS:SASSARI,SU:CARBONIA,SV:SAVONA,TA:TARANTO,TE:TERAMO,TN:TRENTO,TO:TORINO,TP:TRAPANI,TR:TERNI,TS:TRIESTE,TV:TREVISO,UD:UDINE,VA:VARESE,VB:VERBANIA,VC:VERCELLI,VE:VENEZIA,VI:VICENZA,VR:VERONA,VT:VITERBO,VV:VIBO VALENTIA";
+var CAPOLUOGO = {}; SIGLE_PROV.split(",").forEach(function (x) { var p = x.split(":"); CAPOLUOGO[p[0]] = p[1]; });
+function provinciaOCR(s) { var p = String(s || "").toUpperCase().replace(/1/g, "I").replace(/0/g, "O").replace(/5/g, "S").replace(/8/g, "B").replace(/2/g, "Z").replace(/6/g, "G"); return p; }
+
+function ancore(testo) {
+  var righe = String(testo || "").replace(/\r/g, "").split("\n").map(function (r) { return r.replace(/\s+/g, " ").trim(); }).filter(function (r) { return r.length; });
+  var R = righe.map(function (r) { var tk = tokRiga(r); return { r: r, tk: tk, an: ancoreRiga(tk), spaz: riga_spazzatura(r) }; });
+  var out, usate;
+  // resto di una riga tolte le etichette (e i numerini «(1)» dei passaporti)
+  function resto(x) {
+    var s = x.r, sa_ = sa(s), pezzi = [], u = 0;
+    x.an.forEach(function (a) { pezzi.push(s.slice(u, a.i)); u = a.f; }); pezzi.push(s.slice(u));
+    return pezzi.join(" ").replace(/\(\s*\d{1,2}\s*\)/g, " ").replace(/[\/|:;]+/g, " ").replace(/\s+/g, " ").trim();
+  }
+  R.forEach(function (x) { x.resto = x.an.length ? resto(x) : x.r; x.solo = x.an.length > 0 && (x.resto.replace(/[^A-Za-z0-9]/g, "").length < 2 || riga_spazzatura(x.resto)); });
+  var tipoDi = { cognome: "nome", nome: "nome", nascita: "data", luogo: "luogo", luogodata: "luogodata", sesso: "sesso", citt: "citt", numero: "numero", rilascio: "luogo", ignora: "qualsiasi", ignoradata: "data", testata: "niente" };
+  function prova(k, v) { // il valore va bene per il campo k? → valore pulito o ""
+    var t = tipoDi[k];
+    if (t === "nome") return nomeAncora(v);
+    if (t === "data") return dataNorm(v);
+    if (t === "luogodata") { var d = dataNorm(v); return d ? v : ""; }
+    if (t === "luogo") return dataNorm(v) && !/[A-Za-z]{3}/.test(v.replace(/\d{1,2}\s*[A-Za-z]{3,5}\s*\d{2,4}/, "")) ? "" : luogoAncora(v);
+    if (t === "sesso") { var s1 = pulisciValore(v).split(/\s+/)[0] || ""; return /^[MFmf]$/.test(s1) || /^(MASCHIO|FEMMINA|MALE|FEMALE|HOMME|FEMME|MUJER|HOMBRE|MANNLICH|WEIBLICH)$/i.test(sa(s1)) ? sessoDa(s1) : ""; }
+    if (t === "citt") return codicePaese(v);
+    if (t === "numero") return numeroAncora(v);
+    if (t === "qualsiasi") return pulisciValore(v).replace(/[^A-Za-z0-9]/g, "").length >= 1 ? v : "";
+    return "";
+  }
+  function metti(k, v, i, come) {
+    if (!v) return false;
+    if (k === "luogodata") { var d = dataNorm(v); if (d && !out.data_nascita) { out.data_nascita = d; out.da.data_nascita = come; } var l = v.replace(/\d{1,2}\s*[./\-]\s*\d{1,2}\s*[./\-]\s*\d{2,4}.*$/, "").trim(); if (l && !out.luogo) { out.luogo = l; out.da.luogo = come; } }
+    else if (k === "nascita") { if (!out.data_nascita) { out.data_nascita = v; out.da.data_nascita = come; } }
+    else if (k === "ignora" || k === "ignoradata" || k === "testata") { }
+    else if (!out[k]) { out[k] = v; out.da[k] = come; }
+    else return false;
+    if (i != null) usate[i] = true; return true;
+  }
+  // 1) etichetta → valore (stessa riga, poi sotto, poi sopra — o il contrario: si provano tutte e due le impaginazioni)
+  function passo(dir) { out = { da: {} }; usate = {}; var vicini = 0;
+  R.forEach(function (x, i) {
+    var chiavi = x.an.map(function (a) { return a.k; }).filter(function (k, j, ar) { return ar.indexOf(k) === j && k !== "testata"; });
+    if (!chiavi.length) return;
+    if (!x.solo && chiavi.length === 1) { var v0 = prova(chiavi[0], x.resto); if (v0 && metti(chiavi[0], v0, null, "ancora")) return; }
+    // riga con più etichette («SESSO STATURA CITTADINANZA», «Sex/Sexe (5) Place of birth (6)»): il valore sotto si divide per tipo
+    var cerca = function (dir, max) {
+      for (var j = i + dir, n = 0, giri = 0; j >= 0 && j < R.length && n < max && giri < 14; j += dir, giri++) {
+        var y = R[j]; if (y.spaz || usate[j]) continue;
+        if (!y.solo) n++;
+        if (y.solo) { if (dir > 0 && y.an.some(function (a) { return a.k === chiavi[0]; })) continue; if (dir > 0) continue; else break; } // l'altra lingua della stessa etichetta, o un'altra etichetta
+        return j;
+      }
+      return -1;
+    };
+    var assegna = function (j) {
+      var v = R[j].an.length ? R[j].resto : R[j].r;
+      if (chiavi.length === 1) {
+        var vv = prova(chiavi[0], v);
+        if (vv && chiavi[0] === "cognome" && /APELLIDOS|APELIDOS|SOBRENOME/i.test(sa(x.r)) && j + 1 < R.length) { // nome su due righe («APELLIDOS» / «MORENO» / «DIAZ» / «NOMBRE»)
+          var z1 = R[j + 1], z2 = R[j + 2];
+          if (z1 && !z1.spaz && !z1.an.length && !usate[j + 1] && nomeAncora(z1.r) && /^[A-Z' \-]+$/.test(sa(z1.r).trim()) && (!z2 || z2.solo)) { vv = vv + " " + nomeAncora(z1.r); usate[j + 1] = true; }
+        }
+        if (vv && metti(chiavi[0], vv, j, "ancora")) return true; return false;
+      }
+      if (chiavi.indexOf("cognome") >= 0 && chiavi.indexOf("nome") >= 0) return false; // «Surname Given names» / «VAN DER BERG ANDREI»: dove finisce il cognome non si sa
+      // riga con più valori («F ATHENS», «M 180 ITA», «07 NOV /NOV 17 HMPO», «M FRA 12 05 1970»): prima le date, poi i pezzi con forma certa, il resto al luogo
+      var lin = String(v).replace(/[|_~«»%=\\]+/g, " ").replace(/\s+/g, " ").trim(), fatto = false;
+      var reD = /(^|\s)(\d{1,2}[ .\/\-]+(?:\d{1,2}|[A-Za-z]{3,5})(?:\s*\/\s*[A-Za-z]{3,5})?[ .\/\-]+\d{2,4})(?=\s|$)/g, md, date = [];
+      while ((md = reD.exec(lin))) if (dataNorm(md[2])) date.push(dataNorm(md[2]));
+      var resto_ = lin.replace(reD, " ").split(/\s+/).filter(Boolean), presi = [];
+      var chiaviData = chiavi.filter(function (k) { return k === "nascita" || k === "ignoradata" || k === "luogodata"; });
+      chiaviData.forEach(function (k, z) { if (date[z] && k !== "ignoradata" && metti("nascita", date[z], null, "ancora")) fatto = true; });
+      var prendi = function (test) { for (var q = 0; q < resto_.length; q++) if (!presi[q] && test(resto_[q])) { presi[q] = true; return resto_[q]; } return ""; };
+      chiavi.forEach(function (k) {
+        var x;
+        if (k === "sesso") { x = prendi(function (w) { return /^[MFmf]$/.test(w); }); if (x && metti("sesso", x.toUpperCase(), null, "ancora")) fatto = true; }
+        else if (k === "ignora") prendi(function (w) { return /^\d{2,3}$/.test(w); });
+        else if (k === "citt") { x = prendi(function (w) { return !!codicePaese(w) && !/^[MF]$/.test(w); }); if (x && metti("citt", codicePaese(x), null, "ancora")) fatto = true; }
+        else if (k === "numero") { x = prendi(function (w) { return !!numeroAncora(w); }); if (x && metti("numero", numeroAncora(x), null, "ancora")) fatto = true; }
+      });
+      chiavi.forEach(function (k) {
+        if (k !== "luogo" && k !== "rilascio") return;
+        var parole = resto_.filter(function (w, q) { if (presi[q]) return false; return /[A-Za-z]{2}/.test(w) && !/^\d+$/.test(w); });
+        var val = luogoAncora(parole.join(" "));
+        if (val && metti(k, val, null, "ancora")) { fatto = true; resto_.forEach(function (w, q) { if (parole.indexOf(w) >= 0) presi[q] = true; }); }
+      });
+      if (fatto) usate[j] = true; return fatto;
+    };
+    var j = cerca(dir, 3); if (j >= 0 && assegna(j)) { vicini += Math.abs(j - i) <= 2 ? 3 : 2; return; }
+    j = cerca(dir, 5); if (j >= 0 && assegna(j)) { vicini += 2; return; }
+    j = cerca(-dir, 2); if (j >= 0 && assegna(j)) vicini += 1; // trovato solo nell'altra direzione: conta meno
+  });
+  return vicini; }
+  var pAvanti = passo(1), oAvanti = out, pIndietro = passo(-1), oIndietro = out;
+  out = pIndietro > pAvanti ? oIndietro : oAvanti; // a parità: valore sotto l'etichetta (il caso più comune)
+
+  // carta cartacea: «nato il 01.02.1980» … «a CATANIA (CT)»
+  if (!out.luogo) { var nc = /(?:^|\n)\s*(?:nat[oa]\s+)?a\s+([A-Za-z][A-Za-z' .\-]{1,40}?)\s*[(\[{]\s*([A-Za-z0-9]{2})\s*[)\]}]/.exec(sa(righe.join("\n"))); if (nc) { out.luogo = nc[1].trim() + " (" + nc[2] + ")"; out.da.luogo = "ancora"; } }
+  // 2) riconoscimento per forma, dove le etichette non bastano
+  var tutto = righe.join("\n");
+  if (!out.data_nascita || !out.luogo) {
+    var ld = LUOGODATA.exec(sa(tutto));
+    if (ld) { var dd = dataNorm(ld[3].replace(/\s+/g, "")); if (dd && !out.data_nascita) { out.data_nascita = dd; out.da.data_nascita = "forma"; } if (!out.luogo) { out.luogo = ld[1].trim() + " (" + ld[2] + ")"; out.da.luogo = "forma"; } }
+  }
+  var pd = paeseDoc(tutto); if (pd) out.paese_doc = pd;
+  // carta d'identità italiana con le etichette illeggibili: l'ordine è fisso (comune di rilascio, cognome, nome, «CITTÀ (PR) data»)
+  if (pd === "ITA" && /IDENTIT/i.test(sa(tutto)) && (!out.cognome || !out.nome)) {
+    var iLd = -1; for (var q0 = 0; q0 < R.length; q0++) if (LUOGODATA.test(sa(R[q0].r))) { iLd = q0; break; }
+    if (iLd > 0) {
+      var prima = []; for (var q1 = iLd - 1; q1 >= 0 && prima.length < 3; q1--) { var y = R[q1]; if (y.spaz || y.an.length) { if (y.an.some(function (a) { return a.k === "testata"; })) break; continue; } var nn = nomeAncora(y.r); if (!nn) { if (/\d/.test(y.r)) break; continue; } prima.unshift({ v: nn, i: q1 }); }
+      if (prima.length >= 2) {
+        var cg = prima[prima.length - 2].v, nm = prima[prima.length - 1].v;
+        if (!out.cognome && !out.nome) { out.cognome = cg; out.da.cognome = "forma"; out.nome = nm; out.da.nome = "forma"; }
+        if (prima.length === 3 && !out.rilascio) { out.rilascio = prima[0].v; out.da.rilascio = "forma"; }
+      }
+    }
+  }
+  if (!out.numero && pd === "ITA") { var mm = NUM_CIE.exec(sa(tutto).toUpperCase()); if (mm && fixCie(mm[1])) { out.numero = fixCie(mm[1]); out.da.numero = "forma"; } }
+  if (out.numero && pd === "ITA" && /^C[A-Z0-9]/.test(out.numero) && out.numero.length === 9 && fixCie(out.numero)) out.numero = fixCie(out.numero);
+  if (!out.sesso || !out.citt) { var msc = /(?:^|\n)\s*([MF])\s+(\d{3})\s+([A-Z]{3})\s*(?:\n|$)/.exec(tutto); if (msc) { if (!out.sesso) { out.sesso = msc[1]; out.da.sesso = "forma"; } if (!out.citt && codicePaese(msc[3])) { out.citt = codicePaese(msc[3]); out.da.citt = "forma"; } } }
+  if (!out.citt) { var cw = /\b(BRITISH CITIZEN|IRISH|EIREANNACH|FRANCAISE|ESPANOLA|DEUTSCH|ITALIANA)\b/.exec(sa(tutto).toUpperCase()); if (cw) { out.citt = codicePaese(cw[1]); out.da.citt = "forma"; } }
+  // luogo: «POTENZA (PZ)» comune italiano; «PARIGI (FRA)» stato estero
+  if (out.luogo) { var tmp = {}; var lg = out.luogo.replace(/[(\[{]\s*([A-Za-z0-9]{2})\s*[)\]}]/, function (m0, p) { return "(" + provinciaOCR(p) + ")"; }); luogoDa(lg, tmp); out.luogo_p = tmp; }
+  if (out.rilascio) { var rl = norm(out.rilascio); var mc = /^(?:MC|UMC|M C)\s*[- ]?\s*([A-Z]{2})$/.exec(rl); if (mc && CAPOLUOGO[mc[1]]) out.rilascio_comune = CAPOLUOGO[mc[1]]; else if (/\bMIT\b|\bUCO\b|MOTORIZZAZIONE|MINISTERO/.test(rl)) out.rilascio_comune = "ROMA"; else if (pd === "ITA") out.rilascio_comune = rl; }
+  if (pd && pd !== "ITA") out.rilascio_stato_doc = pd;
+  return out;
+}
+
+function N_(x) { return String(x || "").toUpperCase().replace(/[^A-Z0-9]/g, ""); }
+function uniscianc(q, an) {
+  q.euristico = q.euristico || [];
+  var mappa = [["cognome", "cognome"], ["nome", "nome"], ["data_nascita", "data_nascita"], ["sesso", "sesso"], ["citt", "cittadinanza"], ["numero", "numero_documento"]];
+  mappa.forEach(function (m) {
+    var v = an[m[0]], k = m[1], come = an.da[m[0]]; if (!v) return;
+    if (q.tipo_documento === "PATEN" && (k === "sesso" || k === "cittadinanza")) return; // la patente non li riporta
+    if (q.mrz && q[k]) return; // la MRZ con le cifre di controllo vince
+    var eur = q.euristico.indexOf(k) >= 0;
+    if (!q[k]) { q[k] = v; if (come !== "ancora") q.euristico.push(k); }
+    else if (k === "numero_documento" && come === "ancora" && q[k] !== v && N_(q[k]).indexOf(N_(v)) >= 0 && N_(v).length >= 6) q[k] = v; // «GBR540001974» → «540001974»
+    else if ((k === "cognome" || k === "nome") && come === "ancora" && v.indexOf(q[k] + " ") === 0) q[k] = v; // cognome su due righe («SANCHEZ» / «PEREZ»)
+    else if (eur && come === "ancora" && q[k] !== v) { q[k] = v; q.euristico = q.euristico.filter(function (x) { return x !== k; }); }
+  });
+  if (an.luogo_p && !q.comune_nascita && !q.luogo_nascita && !q.stato_nascita) { Object.keys(an.luogo_p).forEach(function (k) { q[k] = an.luogo_p[k]; }); if (an.da.luogo !== "ancora") q.euristico.push("comune_nascita"); }
+  if (an.rilascio_comune && !q.rilascio_comune && !q.rilascio_stato) q.rilascio_comune = an.rilascio_comune;
+  if (an.rilascio_stato_doc && !q.rilascio_stato && !q.rilascio_comune && MRZ && MRZ.PAESI && MRZ.PAESI[an.rilascio_stato_doc]) q.rilascio_stato = MRZ.PAESI[an.rilascio_stato_doc];
+  if (!q.tipo_documento && an.paese_doc === "ITA" && /^C[A-Z]\d{5}[A-Z]{2}$/.test(q.numero_documento || "")) q.tipo_documento = "IDELE";
+}
+
+var api = { _na: function (v) { return [nomeAncora(v), sembraEtichetta(v), pulisciValore(v)]; }, _ar: function (r) { return ancoreRiga(tokRiga(r)); }, _spaz: function (r) { return riga_spazzatura(r); }, ancore: ancore, paeseDoc: paeseDoc, codicePaese: codicePaese, CAPOLUOGO: CAPOLUOGO, unisci: unisci, leggi1: leggi1, riempiti: riempiti, largo: largo, ripara: ripara, euristica: euristica, dividi: dividi, correggiNumero: correggiNumero, blocchi: blocchi, raggruppa: raggruppa, mrzTutte: mrzTutte, cfValido: cfValido, cfControlla: cfControlla, leggi: leggi, persone: persone, confronta: confronta, dataNorm: dataNorm, tipoDocDa: tipoDocDa, sessoDa: sessoDa };
 if (typeof module !== "undefined" && module.exports) module.exports = api; else root.INC = api;
 })(this);
