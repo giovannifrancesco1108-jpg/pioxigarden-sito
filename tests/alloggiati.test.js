@@ -121,3 +121,45 @@ console.log(n + " prove superate");
   assert.ok(Math.abs(media(20, 180) - media(220, 380)) < 40, "l'ombra a metà foto deve sparire");
   console.log("ok  scanner (ritaglio, inclinazione, ombre)");
 })();
+
+/* ---- inglese: dove sta il valore rispetto all'etichetta (dati inventati) ---- */
+(function () {
+  const att = { cognome: "NOVAK", nome: "JANA", data_nascita: "03/05/1985", sesso: "F", numero_documento: "AB1234567" };
+  const casi = {
+    "etichetta: valore": "PASSPORT\nSurname: Novak\nGiven names: Jana\nDate of birth: 03.05.1985\nSex: F\nNationality: CZE\nDocument No: AB1234567",
+    "etichetta sopra": "PASSPORT\nSurname\nNovak\nGiven names\nJana\nDate of birth\n03 MAY 1985\nSex\nF\nNationality\nCZE\nPassport No\nAB1234567",
+    "valore sopra": "PASSPORT\nNovak\nSurname\nJana\nGiven names\n03/05/1985\nDate of birth\nF\nSex\nCZE\nNationality\nAB1234567\nPassport No",
+    "elenco etichette poi valori": "IDENTITY CARD\nSurname\nGiven names\nDate of birth\nSex\nNationality\nDocument number\nNOVAK\nJANA\n1985-05-03\nF\nCZE\nAB1234567",
+    "due etichette sulla stessa riga": "IDENTITY CARD\nSurname Given names\nNOVAK JANA\nBirth date\n03.05.1985\nGender\nF\nCitizenship\nCZE\nID No\nAB1234567",
+    "etichette bilingui e storpiate": "REPUBLIC\nPriezvisko / Sumame\nNOVAK\nMeno / Govee names\nJANA\nDatum narodenia / Dote of birth\n03.05.1985\nPohlavie / Sex\nF\nNationality\nCZE\nCislo dokladu / Document No\nAB1234567",
+  };
+  Object.keys(casi).forEach((nome) => {
+    const r = INC.leggi(casi[nome]); assert.equal(r.persone.length, 1, nome);
+    Object.keys(att).forEach((k) => assert.equal(r.persone[0][k], att[k], nome + ": " + k));
+  });
+  console.log("ok  inglese: 6 impaginazioni diverse");
+})();
+
+// ---- carte italiane (dati INVENTATI, impaginazione come le carte vere) ----
+(function () {
+  const cie = (luogo, sesso, citt) => "REPUBBLICA ITALIANA\nMINISTERO DELL'INTERNO\nCARTA DI IDENTITA / IDENTITY CARD\nCOMUNE DI / MUNICIPALITY\nROMA\nCOGNOME / SURNAME\nBIANCHI\nNOME / NAME\nLUCA\nLUOGO E DATA DI NASCITA\nPLACE AND DATE OF BIRTH\n" + luogo + " 12.03.1985\nSESSO STATURA CITTADINANZA\nSEX HEIGHT NATIONALITY\n" + sesso + " 180 " + citt + "\nEMISSIONE / ISSUING\n30.06.2022\nSCADENZA / EXPIRY\n12.03.2033\nCA12345AB";
+  let p = INC.leggi(cie("ROMA (RM)", "M", "ITA")).persone[0];
+  assert.equal(p.cognome, "BIANCHI"); assert.equal(p.nome, "LUCA"); assert.equal(p.sesso, "M");
+  assert.equal(p.cittadinanza, "ITA"); assert.equal(p.comune_nascita, "ROMA"); assert.equal(p.provincia_nascita, "RM");
+  assert.equal(p.numero_documento, "CA12345AB");
+  p = INC.leggi(cie("LENINGRADO (SUN)", "F", "RUS")).persone[0];
+  assert.equal(p.sesso, "F"); assert.equal(p.cittadinanza, "RUS");
+  assert.ok(!p.comune_nascita, "all'estero: nessun comune italiano"); assert.equal(p.stato_nascita, "SUN");
+  p = INC.leggi(cie("ST.NIKLAAS (BEL)", "F", "ITA")).persone[0];
+  assert.equal(p.stato_nascita, "BEL"); assert.ok(!p.provincia_nascita);
+  console.log("ok  CIE italiana: tre etichette su una riga e nato all'estero");
+})();
+(function () {
+  const sporco = ".* * x PATENTE DI GUIDA REPUBBLICA ITALIANA\nwi | i 1. VERDI\nke KL 2. PAOLO\n3. 16/02/73 GENOVA (GE)\n4a, 04/11/2022 4c. MIT-UCO\n> <a 4b. 16/02/2033\n77 5, U188L2809S\n—a 7.";
+  const a = INC.leggi(sporco).persone[0];
+  assert.equal(a.cognome, "VERDI"); assert.equal(a.nome, "PAOLO"); assert.equal(a.data_nascita, "16/02/1973");
+  assert.equal(a.comune_nascita, "GENOVA"); assert.equal(a.numero_documento, "U188L2809S");
+  const b = INC.leggi("PATENTE DI GUIDA REPUBBLICA ITALIANA\n\n1\n\nVERDI\n\n2\n\nPAOLO\n\n3\n\n16/02/73\n\nGENOVA (GE)\n\n5, U188L2809S").persone[0];
+  assert.equal(b.cognome, "VERDI"); assert.equal(b.nome, "PAOLO");
+  console.log("ok  patente con OCR sporco (rumore, numeri su righe separate)");
+})();
