@@ -90,3 +90,34 @@ ok("insieme: arrivo, notti, doppioni, tabelle", () => {
   assert.ok(r.err.length >= 4);
 });
 console.log(n + " prove superate");
+
+/* ---- OCR sporco di documenti esteri (testo reale incollato dall'utente, dati d'esempio) ---- */
+(function () {
+  const t = "SLOVENSKA REPUBLIKA SLOVAK REPURLIC\nOBCUNSKY PREUKAZ :ID-CARD\nPelecciseo / Sumame\nKovalčik\nento/ Govee names\nPeter\nSrlere sociaservs / Netionolty\nSVK\nhsmesce\nM\n07.07.1987\nHosne oroveuro\n870707/9634\nSVK\nMG029748\nDatum platnasti / Dote of expin\n23.06.2031\nwwln ano oe ge ls\nSpišská Nová Ves\n23.06.2021 Podis dritelo / Sgnature\ntárdck";
+  const r = INC.leggi(t); assert.equal(r.persone.length, 1);
+  const p = r.persone[0];
+  assert.equal(p.cognome, "KOVALCIK"); assert.equal(p.nome, "PETER"); assert.equal(p.cittadinanza, "SVK");
+  assert.equal(p.data_nascita, "07/07/1987"); assert.equal(p.sesso, "M"); assert.equal(p.numero_documento, "MG029748");
+  assert.ok(p.dubbi.includes("data_nascita") && p.dubbi.includes("numero_documento"), "i campi trovati senza etichetta restano da controllare");
+  assert.equal(INC.ripara("Vorname"), "Vorname", "un'etichetta vera non va cambiata");
+  assert.equal(INC.ripara("Given names"), "Given names");
+  assert.equal(INC.ripara("Date of birth 13/08/1974"), "Date of birth 13/08/1974", "le date con la barra restano intatte");
+  console.log("ok  documento slovacco con OCR sporco");
+})();
+
+/* ---- scanner: ritaglio, raddrizzamento, ombre ---- */
+(function () {
+  const SCAN = require("../admin/alloggiati/scanner.js");
+  const w = 400, h = 300, g = new Uint8Array(w * h).fill(90), ang = 7 * Math.PI / 180, cx = 200, cy = 150;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const u = (x - cx) * Math.cos(ang) + (y - cy) * Math.sin(ang), v = -(x - cx) * Math.sin(ang) + (y - cy) * Math.cos(ang);
+    if (Math.abs(u) < 150 && Math.abs(v) < 100) { g[y * w + x] = 225; if (Math.abs(u) < 130 && Math.floor((v + 100) / 8) % 2 === 0 && Math.abs(v) < 85) g[y * w + x] = 30; }
+  }
+  const a = SCAN.inclinazione(g, w, h);
+  assert.ok(Math.abs(Math.abs(a) - 7) <= 2, "inclinazione stimata " + a);
+  const rit = SCAN.ritaglio(g, w, h); assert.ok(rit.w <= w && rit.h <= h && rit.w > 150);
+  const ombra = new Uint8Array(w * h); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) ombra[y * w + x] = (x < 200 ? 110 : 220) - ((y >> 3) % 2 ? 60 : 0);
+  const n = SCAN.normalizza(ombra, w, h); const media = (x0, x1) => { let s = 0, c = 0; for (let y = 0; y < h; y++) for (let x = x0; x < x1; x++) { s += n[y * w + x]; c++; } return s / c; };
+  assert.ok(Math.abs(media(20, 180) - media(220, 380)) < 40, "l'ombra a metà foto deve sparire");
+  console.log("ok  scanner (ritaglio, inclinazione, ombre)");
+})();
