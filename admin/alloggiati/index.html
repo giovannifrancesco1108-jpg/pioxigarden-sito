@@ -61,6 +61,7 @@ details[open].card>summary::after{content:"▴"}
 .dubbio input,.dubbio select{border-color:var(--warn);box-shadow:0 0 0 1px var(--warn) inset}
 .dubbio>span.t::after{content:" · controlla";color:var(--warn)}
 .manca input,.manca select{border-color:var(--bad)}
+.rev{display:grid;gap:10px}.rev .p{border:1px solid var(--line,#d8d8d8);border-radius:12px;padding:10px;display:grid;gap:4px}.rev .p label{display:flex;gap:8px;align-items:center;font-weight:700}.rev .p small{display:block}.rev .p .ko{color:var(--bad)}.rev .p .av{color:var(--warn)}
 .cm{display:block;font-size:12px;margin-top:3px}.cm.ko{color:var(--bad)}.cm.av{color:var(--warn)}
 #incT{width:100%;min-height:110px;font:14px/1.4 ui-monospace,monospace}
 .esito{font-size:14px;font-weight:600;margin:0}.esito.ok{color:var(--good)}.esito.ko{color:var(--bad)}
@@ -84,7 +85,7 @@ details[open].card>summary::after{content:"▴"}
 </head>
 <body>
 <main>
-<header><h1>Alloggiati Web<small>Comunicazione degli ospiti alla Questura</small></h1><p style="margin:4px 0 0;font-weight:700;color:#0a7a3d">VERSIONE 6 · FOTO → TESTO → COMPILAZIONE (OFFLINE)</p><a class="btn g s" href="/admin/">← Pannello</a></header>
+<header><h1>Alloggiati Web<small>Comunicazione degli ospiti alla Questura</small></h1><p style="margin:4px 0 0;font-weight:700;color:#0a7a3d">VERSIONE 7 · CONFERMA PRIMA DI INSERIRE</p><a class="btn g s" href="/admin/">← Pannello</a></header>
 
 <section class="card" id="auth" hidden>
  <h2>Accedi</h2>
@@ -136,6 +137,7 @@ details[open].card>summary::after{content:"▴"}
    <div class="row"><button class="btn" type="button" id="incGo">Leggi il testo</button><button class="btn g" type="button" id="incAi" hidden>Confronta con l'AI</button><button class="btn g s" type="button" id="incPul">Svuota</button></div>
    <p class="hint">Il testo non viene salvato. Dopo la lettura controllo i codici, le cifre di controllo e, se hai fotografato il documento, confronto foto e testo.</p>
    <p class="msg" id="mI" role="status"></p>
+   <div id="rev" hidden></div>
   </div>
  </details>
  <label class="drop big" id="drop"><b>📷 Fotografa i documenti</b><span>Leggo le righe &lt;&lt;&lt; e il testo del documento qui sul telefono, poi li confronto. Ci mette qualche secondo per foto. Poi controlli tu.</span><input type="file" id="foto" accept="image/*" multiple></label>
@@ -366,10 +368,7 @@ function daTesto(p){var q=adatta(p),g=daAI(q,[]);g.src={testo:1};g.mrz=p.mrz||nu
 function leggiIncolla(usaAI){var t=$("incT").value;if(!t.trim())return say($("mI"),"Incolla prima il testo del documento.");
  var loc=INC.leggi(t),fine=function(P,nota){
   if(!P.length)return say($("mI"),(nota||(loc.note[0]||"Non ho trovato dati nel testo."))+" Prova a incollare anche le righe con <<<, oppure compila a mano.");
-  P.forEach(function(p){aggiungi(daTesto(p))});$("incT").value="";ESITI=null;controlla();render();
-  var sp=document.getElementById("ospiti").lastElementChild;if(sp)sp.scrollIntoView({behavior:"smooth",block:"start"});
-  var dub=0;G.forEach(function(g){dub+=Object.keys(g.dubbi||{}).length});
-  say($("mI"),"Letto: "+P.length+" person"+(P.length===1?"a":"e")+". "+(dub||AVV.length?"Guarda i campi in giallo e i messaggi sotto i campi.":"Controlli superati: nessun campo dubbio."),!dub)};
+  mostraRevisione(P)};
  if(!usaAI)return fine(loc.persone);
  say($("mI"),"Confronto con l'AI…",true);
  api("POST","leggi_testo",{testo:t.slice(0,8000)}).then(function(j){var P=loc.persone.slice();
@@ -381,6 +380,39 @@ function leggiIncolla(usaAI){var t=$("incT").value;if(!t.trim())return say($("mI
 $("incGo").onclick=function(){leggiIncolla(false)};
 $("incAi").onclick=function(){leggiIncolla(true)};
 $("incPul").onclick=function(){$("incT").value="";say($("mI"),"",true)};
+
+/* ---------- conferma prima di inserire: le persone lette stanno qui finché non dici di sì ---------- */
+var REV=[];
+function etaDi(g){var d=CTL.data(g.nascita),a=$("arr").value?new Date($("arr").value):new Date();return d?CTL.etaAl(d,a):null}
+function luogoDi(g){var st=g.statoN?perCodice(g.statoN):null;if(!st)return"";if(g.statoN===ITALIA){var c=g.comuneN?perCodice(g.comuneN):null;return c?etich(c):"Italia (comune da scegliere)"}return etich(st)}
+function mostraRevisione(P){
+ var box=$("rev");REV=P.map(function(p){var g=daTesto(p);g.src={testo:1};var r=CTL.ospite(g,{arrivo:$("arr").value||iso(new Date()),capo:true,perCodice:perCodice,doc:TAB.doc});return{g:g,p:p,err:r.err,avv:r.avv,eta:etaDi(g),ok:true,dup:G.some(function(e){return stessa(e,g)})}});
+ REV.sort(function(a,b){return(b.eta||0)-(a.eta||0)});
+ box.innerHTML="";box.className="rev";box.hidden=false;
+ var t=document.createElement("p");t.className="hint";t.innerHTML="<b>Controlla prima di inserire.</b> Ho letto "+REV.length+" person"+(REV.length===1?"a":"e")+": togli la spunta a chi non va inserito. Chi è più grande sarà il capo.";box.appendChild(t);
+ REV.forEach(function(r,i){var g=r.g,d=document.createElement("div"),n=Object.keys(r.err).length,dub=Object.keys(g.dubbi||{}).length;d.className="p";
+  var h='<label><input type="checkbox" checked data-i="'+i+'"> '+esc((g.cognome+" "+g.nome).trim()||"Persona "+(i+1))+(r.eta!=null?" · "+r.eta+" anni":"")+"</label>";
+  h+="<small>"+esc([g.sesso==="F"?"Femmina":g.sesso==="M"?"Maschio":"sesso ?",g.nascita||"data ?","nato a "+(luogoDi(g)||"?"),"cittadinanza "+(g.citt?etich(perCodice(g.citt)):"?")].join(" · "))+"</small>";
+  var td=TAB.doc.filter(function(x){return x.c===g.doc})[0];
+  h+="<small>"+esc("Documento: "+(td?td.n:g.doc||"?")+" n. "+(g.num||"?")+" · rilasciato a "+(g.ril?etich(perCodice(g.ril)):"?"))+"</small>";
+  (r.p.fonti||[]).length>1&&(h+='<small class="av">Letto da testo e da MRZ: '+esc(g.conf||"")+"</small>");
+  (r.p.avvisi||[]).forEach(function(a){h+='<small class="av">⚠️ '+esc(a)+"</small>"});
+  Object.keys(r.err).forEach(function(k){h+='<small class="ko">✗ '+esc(F[k])+": "+esc(r.err[k])+"</small>"});
+  Object.keys(r.avv).forEach(function(k){h+='<small class="av">⚠️ '+esc(F[k])+": "+esc(r.avv[k])+"</small>"});
+  if(r.dup)h+='<small class="av">Questa persona è già nell\'elenco: la unisco, non la raddoppio.</small>';
+  if(!n&&!dub&&!(r.p.avvisi||[]).length)h+='<small style="color:var(--ok,#0a7a3d)">✓ Controlli superati</small>';
+  d.innerHTML=h;box.appendChild(d)});
+ if(REV.length>1){var fam=REV.every(function(r){return norm(r.g.cognome)===norm(REV[0].g.cognome)}),q=document.createElement("p");q.className="hint";q.textContent="Li registro come "+(fam?"una famiglia (stesso cognome)":"un gruppo")+". Lo puoi cambiare dopo, sopra gli ospiti.";box.appendChild(q)}
+ var row=document.createElement("div");row.className="row";row.innerHTML='<button class="btn" type="button" id="revSi">Inserisci i selezionati</button><button class="btn g s" type="button" id="revNo">Annulla</button>';box.appendChild(row);
+ [].forEach.call(box.querySelectorAll("input[data-i]"),function(c){c.onchange=function(){REV[+c.dataset.i].ok=c.checked}});
+ $("revNo").onclick=function(){box.hidden=true;box.innerHTML="";REV=[];say($("mI"),"Annullato: il testo è ancora qui, puoi correggerlo.",true)};
+ $("revSi").onclick=function(){var sel=REV.filter(function(r){return r.ok});if(!sel.length){say($("mI"),"Non hai selezionato nessuno.");return}
+  var fam=sel.length>1&&sel.every(function(r){return norm(r.g.cognome)===norm(sel[0].g.cognome)});
+  sel.forEach(function(r){aggiungi(r.g)});if(sel.length>1){tipo=fam?"f":"g";[].forEach.call($("tipo").children,function(x){x.setAttribute("aria-pressed",x.dataset.t===tipo)})}
+  $("incT").value="";box.hidden=true;box.innerHTML="";REV=[];ESITI=null;controlla();render();
+  var sp=$("ospiti").lastElementChild;if(sp)sp.scrollIntoView({behavior:"smooth",block:"start"});
+  say($("mI"),"Inserite "+sel.length+" person"+(sel.length===1?"a":"e")+". Completa i campi in giallo o rossi sotto.",true)};
+ say($("mI"),"Letto. Controlla qui sotto e conferma.",true);box.scrollIntoView({behavior:"smooth",block:"nearest"})}
 
 /* ---------- schedine nel formato ufficiale ---------- */
 function pad(s,n){s=norm(s);return(s+" ".repeat(n)).slice(0,n)}
