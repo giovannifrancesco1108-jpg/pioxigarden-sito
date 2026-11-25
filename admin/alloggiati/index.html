@@ -61,6 +61,8 @@ details[open].card>summary::after{content:"▴"}
 .dubbio input,.dubbio select{border-color:var(--warn);box-shadow:0 0 0 1px var(--warn) inset}
 .dubbio>span.t::after{content:" · controlla";color:var(--warn)}
 .manca input,.manca select{border-color:var(--bad)}
+.cm{display:block;font-size:12px;margin-top:3px}.cm.ko{color:var(--bad)}.cm.av{color:var(--warn)}
+#incT{width:100%;min-height:110px;font:14px/1.4 ui-monospace,monospace}
 .esito{font-size:14px;font-weight:600;margin:0}.esito.ok{color:var(--good)}.esito.ko{color:var(--bad)}
 .ac{position:absolute;left:0;right:0;top:100%;z-index:30;margin:4px 0 0;padding:6px;list-style:none;background:#203a4a;border:1px solid var(--line);border-radius:14px;box-shadow:0 14px 34px rgba(0,0,0,.45);max-height:260px;overflow:auto}
 .ac li{padding:10px 12px;border-radius:10px;cursor:pointer;color:var(--fg);font-weight:600}
@@ -82,7 +84,7 @@ details[open].card>summary::after{content:"▴"}
 </head>
 <body>
 <main>
-<header><h1>Alloggiati Web<small>Comunicazione degli ospiti alla Questura</small></h1><p style="margin:4px 0 0;font-weight:700;color:#0a7a3d">VERSIONE 4 · APPARTAMENTO DAL PORTALE</p><a class="btn g s" href="/admin/">← Pannello</a></header>
+<header><h1>Alloggiati Web<small>Comunicazione degli ospiti alla Questura</small></h1><p style="margin:4px 0 0;font-weight:700;color:#0a7a3d">VERSIONE 5 · INCOLLA TESTO + CONTROLLI</p><a class="btn g s" href="/admin/">← Pannello</a></header>
 
 <section class="card" id="auth" hidden>
  <h2>Accedi</h2>
@@ -128,6 +130,14 @@ details[open].card>summary::after{content:"▴"}
 
 <section class="card" id="nuova">
  <h2>Nuova comunicazione</h2>
+ <details id="inc"><summary><b>📋 Incolla il testo del documento</b></summary>
+  <div style="display:grid;gap:8px;margin-top:8px">
+   <textarea id="incT" placeholder="Incolla qui il testo copiato, anche le righe con &lt;&lt;&lt;: cognome, nome, data di nascita, numero… Funziona anche senza internet." spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+   <div class="row"><button class="btn" type="button" id="incGo">Leggi il testo</button><button class="btn g" type="button" id="incAi" hidden>Confronta con l'AI</button><button class="btn g s" type="button" id="incPul">Svuota</button></div>
+   <p class="hint">Il testo non viene salvato. Dopo la lettura controllo i codici, le cifre di controllo e, se hai fotografato il documento, confronto foto e testo.</p>
+   <p class="msg" id="mI" role="status"></p>
+  </div>
+ </details>
  <label class="drop big" id="drop"><b>📷 Fotografa i documenti</b><span>Il lato con le righe &lt;&lt;&lt; (passaporto, retro della carta d'identità): leggo i dati qui sul telefono. Poi controlli tu.</span><input type="file" id="foto" accept="image/*" multiple></label>
  <div class="grid2">
   <label>Giorno di arrivo<input type="date" id="arr"></label>
@@ -165,6 +175,8 @@ details[open].card>summary::after{content:"▴"}
 </div></div>
 
 <script src="/admin/alloggiati/mrz.js"></script>
+<script src="/admin/alloggiati/controlli.js"></script>
+<script src="/admin/alloggiati/incolla.js"></script>
 <script>
 (function(){
 "use strict";
@@ -193,7 +205,7 @@ function caricaTabelle(){return api("GET","tabelle").then(function(j){TAB={stati
  [TAB.stati,TAB.comuni].forEach(function(L){L.sort(function(a,b){return a.x-b.x||a.n.localeCompare(b.n)})});
  ST.tab=j.info;var s=$("app");s.innerHTML="";TAB.app.forEach(function(a){var o=document.createElement("option");o.value=a.c;o.textContent=a.n;s.appendChild(o)});$("appL").hidden=!TAB.app.length;
  render()})}
-var SIN={"STATI UNITI":"STATI UNITI D'AMERICA","USA":"STATI UNITI D'AMERICA","GRAN BRETAGNA":"REGNO UNITO","INGHILTERRA":"REGNO UNITO","OLANDA":"PAESI BASSI","RUSSIA":"FEDERAZIONE RUSSA","REPUBBLICA CECA":"CECA, REPUBBLICA","CINA":"CINESE, REPUBBLICA POPOLARE","COREA DEL SUD":"COREA, REPUBBLICA (COREA DEL SUD)"};
+var SIN={"ITALIANA":"ITALIA","ITALIANO":"ITALIA","ITALIAN":"ITALIA","FRANCESE":"FRANCIA","FRENCH":"FRANCIA","TEDESCA":"GERMANIA","TEDESCO":"GERMANIA","GERMAN":"GERMANIA","SPAGNOLA":"SPAGNA","SPAGNOLO":"SPAGNA","SPANISH":"SPAGNA","BRITANNICA":"REGNO UNITO","BRITISH":"REGNO UNITO","AMERICANA":"STATI UNITI D'AMERICA","AMERICAN":"STATI UNITI D'AMERICA","STATI UNITI":"STATI UNITI D'AMERICA","USA":"STATI UNITI D'AMERICA","GRAN BRETAGNA":"REGNO UNITO","INGHILTERRA":"REGNO UNITO","OLANDA":"PAESI BASSI","RUSSIA":"FEDERAZIONE RUSSA","REPUBBLICA CECA":"CECA, REPUBBLICA","CINA":"CINESE, REPUBBLICA POPOLARE","COREA DEL SUD":"COREA, REPUBBLICA (COREA DEL SUD)"};
 function trova(L,nome,prov){var k=norm(nome);if(!k)return null;var s=SIN[k];
  var es=L.filter(function(o){return o.k===k||(s&&o.k===norm(s))});if(prov){var ep=es.filter(function(o){return o.p===prov});if(ep.length)es=ep}
  if(es.length)return es.find(function(o){return!o.x})||es[0];
@@ -216,12 +228,13 @@ function daAI(p,foto){var g=nuovo(p);g.foto=foto;(p.dubbi||[]).forEach(function(
 function capoTipo(){return G.length<2?"16":tipo==="f"?"17":"18"}
 function membroTipo(){return tipo==="f"?"19":"20"}
 var F={cognome:"Cognome",nome:"Nome",sesso:"Sesso",nascita:"Data di nascita",statoN:"Stato di nascita",comuneN:"Comune di nascita",citt:"Cittadinanza",doc:"Documento",num:"Numero del documento",ril:"Rilasciato a"};
-function campo(g,k,html,dubbio){var cls=(dubbio?" dubbio":"")+(g._manca&&g._manca[k]?" manca":"");return'<label class="'+cls+'"><span class="t">'+F[k]+"</span>"+html+"</label>"}
-function render(){var box=$("ospiti");box.innerHTML="";$("tipoBox").hidden=G.length<2;$("bar").hidden=!G.length;
+function campo(g,k,html,dubbio){var cls=(dubbio?" dubbio":"")+(g._manca&&g._manca[k]?" manca":""),m=g._msg&&g._msg[k]?'<small class="cm ko">'+esc(g._msg[k])+"</small>":g._avv&&g._avv[k]?'<small class="cm av">'+esc(g._avv[k])+"</small>":"";return'<label class="'+cls+'"><span class="t">'+F[k]+"</span>"+html+m+"</label>"}
+function render(){var box=$("ospiti");box.innerHTML="";$("tipoBox").hidden=G.length<2;$("incAi").hidden=!ST.ai;$("bar").hidden=!G.length;
  G.forEach(function(g,i){var capo=i===0,d=document.createElement("div");d.className="ospite"+(ESITI&&ESITI[i]?(ESITI[i].ok?" ok":" err"):"");d.dataset.id=g.id;
   var ruolo=G.length<2?"Ospite singolo":capo?(tipo==="f"?"Capofamiglia":"Capogruppo"):(tipo==="f"?"Familiare":"Membro del gruppo");
   var h='<div class="o-top"><h3>'+(esc((g.cognome+" "+g.nome).trim())||"Ospite "+(i+1))+"<small>"+ruolo+'</small></h3><div class="row" style="gap:6px">'+(capo?"":'<button class="btn g s" type="button" data-a="capo">Rendi '+(tipo==="f"?"capofamiglia":"capogruppo")+"</button>")+'<button class="btn ko s" type="button" data-a="via" aria-label="Togli ospite">✕</button></div></div>';
   if(g.foto.length)h+='<div class="thumbs">'+g.foto.map(function(u,j){return'<img src="'+u+'" alt="Documento, foto '+(j+1)+'" data-z="'+j+'">'}).join("")+"</div>";
+  if(g.conf)h+='<p class="esito '+(g.confOk?"ok":"ko")+'">'+(g.confOk?"✓ ":"⚠️ ")+esc(g.conf)+"</p>";
   if(ESITI&&ESITI[i]&&!ESITI[i].ok)h+='<p class="esito ko">⚠️ '+esc(ESITI[i].errore)+"</p>";else if(ESITI&&ESITI[i])h+='<p class="esito ok">✓ '+(ESITI.inviata?"Inviata":"Va bene")+"</p>";
   h+='<div class="grid2">'+campo(g,"cognome",'<input type="text" data-k="cognome" autocomplete="off" autocapitalize="characters" maxlength="50">',g.dubbi.cognome)+campo(g,"nome",'<input type="text" data-k="nome" autocomplete="off" autocapitalize="characters" maxlength="30">',g.dubbi.nome)+"</div>";
   h+='<div class="grid2">'+campo(g,"sesso",'<select data-k="sesso"><option value="">—</option><option value="M">Maschio</option><option value="F">Femmina</option></select>',g.dubbi.sesso)+campo(g,"nascita",'<input type="text" data-k="nascita" inputmode="numeric" placeholder="gg/mm/aaaa" maxlength="10" autocomplete="off">',g.dubbi.data_nascita)+"</div>";
@@ -271,7 +284,7 @@ function leggiMRZ(w,im){var giri=[0,90,270,180],i=0;
  function prova(){if(i>=giri.length)return Promise.resolve(null);var c=tela(im,giri[i++],2000);
   return w.recognize(c).then(function(r){var x=MRZ.leggi(r.data.text);return x||prova()})}
  return prova()}
-function daMRZ(r,foto){var g=nuovo({cognome:r.cognome,nome:r.nome,sesso:r.sesso,data_nascita:r.nascita,numero_documento:r.numero});g.foto=foto;
+function daMRZ(r,foto){var g=nuovo({cognome:r.cognome,nome:r.nome,sesso:r.sesso,data_nascita:r.nascita,numero_documento:r.numero});g.foto=foto;g.mrz=r;g.src={foto:1};
  var paese=function(c){return MRZ.PAESI[c]?trova(TAB.stati,MRZ.PAESI[c]):null},naz=paese(r.nazionalita),em=paese(r.emittente);
  if(naz){g.citt=naz.c;g.statoN=naz.c}else g.dubbi.cittadinanza=1;
  g.dubbi.stato_nascita=1; // la MRZ non dice dove è nato: di solito è il paese della cittadinanza
@@ -292,7 +305,7 @@ $("foto").addEventListener("change",function(){var fs=[].slice.call(this.files||
  .then(function(){
   if(senza.length&&nuovi.length){nuovi[nuovi.length-1].foto=nuovi[nuovi.length-1].foto.concat(senza);senza=[]}
   if(!nuovi.length&&senza.length&&ST.ai){say($("mL"),"Non trovo le righe <<<: provo con l'AI…",true);return leggiConAI(fs)}
-  nuovi.forEach(function(g){G.push(g)});
+  nuovi.forEach(aggiungi);
   if(!nuovi.length){var g=nuovo();g.foto=senza;G.push(g)}
   ESITI=null;render();
   say($("mL"),nuovi.length?"Letto"+(nuovi.length>1?": "+nuovi.length+" persone":"")+". Completa i campi in giallo guardando la foto (per gli italiani: comune di nascita e luogo di rilascio).":"Non trovo le righe <<< in queste foto: fotografa il lato con le righe <<<, oppure compila guardando la foto.",nuovi.length>0);
@@ -306,18 +319,70 @@ function leggiConAI(fs){return Promise.all(fs.slice(0,4).map(comprimi)).then(fun
 $("aMano").onclick=function(){G.push(nuovo());ESITI=null;render();var l=$("ospiti").lastElementChild;l.scrollIntoView({behavior:"smooth",block:"start"});l.querySelector("input").focus({preventScroll:true})};
 $("tipo").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;tipo=b.dataset.t;[].forEach.call(this.children,function(x){x.setAttribute("aria-pressed",x===b)});ESITI=null;render()});
 
+/* ---------- incolla il testo del documento (anche senza internet e senza AI) + confronto con la foto ---------- */
+var CHIAVE={cognome:"cognome",nome:"nome","data di nascita":"data_nascita",sesso:"sesso","numero del documento":"numero_documento"};
+function stessa(a,b){var n=function(x){return norm(x).replace(/ /g,"")};return(n(a.cognome)&&n(a.cognome)===n(b.cognome)&&(!n(a.nome)||!n(b.nome)||n(a.nome).indexOf(n(b.nome))===0||n(b.nome).indexOf(n(a.nome))===0))||(n(a.num)&&n(a.num)===n(b.num))}
+/* due letture della stessa persona (foto e testo): si tiene quella con la MRZ (ha le cifre di controllo), si riempiono i vuoti e si segnalano le differenze */
+function incrocia(a,b){var pa={cognome:a.cognome,nome:a.nome,sesso:a.sesso,data_nascita:a.nascita,numero_documento:a.num},pb={cognome:b.cognome,nome:b.nome,sesso:b.sesso,data_nascita:b.nascita,numero_documento:b.num},dif=INC.confronta(pa,pb);
+ var m=a.mrz?a:b,t=m===a?b:a;
+ ["cognome","nome","sesso","nascita","num","statoN","comuneN","citt","doc","ril"].forEach(function(k){if(!m[k]&&t[k])m[k]=t[k]});
+ if(m.dubbi.stato_nascita&&t.statoN&&!t.dubbi.stato_nascita){m.statoN=t.statoN;m.comuneN=t.comuneN;delete m.dubbi.stato_nascita;delete m.dubbi.comune_nascita;if(t.dubbi.comune_nascita)m.dubbi.comune_nascita=1}
+ if(m.dubbi.rilascio&&t.ril&&!t.dubbi.rilascio){m.ril=t.ril;delete m.dubbi.rilascio}
+ if(m.dubbi.tipo_documento&&t.doc&&!t.dubbi.tipo_documento){m.doc=t.doc;delete m.dubbi.tipo_documento}
+ dif.forEach(function(d){m.dubbi[CHIAVE[d]]=1});
+ m.foto=(a.foto||[]).concat(b.foto||[]).slice(0,4);m.src={foto:(a.src&&a.src.foto)||(b.src&&b.src.foto)?1:0,testo:(a.src&&a.src.testo)||(b.src&&b.src.testo)?1:0};
+ m.mrz=a.mrz||b.mrz;m.conf=dif.length?"Foto e testo non coincidono su: "+dif.join(", ")+". Tengo i valori con le cifre di controllo: guarda il documento.":"Foto e testo coincidono.";m.confOk=!dif.length;return m}
+function aggiungi(g){for(var i=0;i<G.length;i++){var e=G[i];if(stessa(e,g)&&((g.src&&g.src.foto&&!(e.src&&e.src.foto))||(g.src&&g.src.testo&&!(e.src&&e.src.testo)))){G[i]=incrocia(e,g);return}}G.push(g)}
+function adatta(p){var q={};for(var k in p)q[k]=p[k];q.dubbi=(p.dubbi||[]).slice();
+ if(/^[A-Z]{3}$/.test(q.cittadinanza||"")&&MRZ.PAESI[q.cittadinanza])q.cittadinanza=MRZ.PAESI[q.cittadinanza];
+ if(!q.stato_nascita&&!q.comune_nascita&&q.luogo_nascita){var c=trova(TAB.comuni,q.luogo_nascita);
+  if(c){q.comune_nascita=q.luogo_nascita;q.provincia_nascita=q.provincia_nascita||c.p;q.stato_nascita="ITALIA"}
+  else{var st=trova(TAB.stati,q.luogo_nascita);if(st)q.stato_nascita=st.n;else{q.dubbi.push("stato_nascita");if(q.cittadinanza)q.stato_nascita=q.cittadinanza}}}
+ if(!q.stato_nascita&&!q.comune_nascita&&q.cittadinanza){q.stato_nascita=q.cittadinanza;q.dubbi.push("stato_nascita")}
+ if(q.stato_nascita&&/^[A-Z]{3}$/.test(q.stato_nascita)&&MRZ.PAESI[q.stato_nascita])q.stato_nascita=MRZ.PAESI[q.stato_nascita];
+ if(q.rilascio_testo&&!q.rilascio_comune&&!q.rilascio_stato){var t=norm(q.rilascio_testo),m=/(?:COMUNE|QUESTURA|PREFETTURA|MUNICIPIO|QUESTURA|COMMISSARIATO)\s+(?:DI\s+)?(.+)$/.exec(t);
+  if(/\bMIT\b|MINISTERO|\bMAE\b|MOTORIZZAZIONE|\bUCO\b|AFFARI ESTERI/.test(t))q.rilascio_comune="ROMA";else if(m)q.rilascio_comune=m[1];
+  else if(trova(TAB.comuni,t))q.rilascio_comune=t;else if(trova(TAB.stati,t))q.rilascio_stato=t;else q.dubbi.push("rilascio");
+  if(q.rilascio_comune)q.rilascio_stato="ITALIA"}
+ return q}
+function daTesto(p){var q=adatta(p),g=daAI(q,[]);g.src={testo:1};g.mrz=p.mrz||null;g.testo=1;
+ if(p.mrz&&!g.dubbi.rilascio&&!g.ril)g.dubbi.rilascio=1;
+ if(p.avvisi&&p.avvisi.length){g.conf=p.avvisi.join(" ");g.confOk=false}
+ else if(p.fonti&&p.fonti.length>1){g.conf="Testo e righe MRZ coincidono.";g.confOk=true}
+ return g}
+function leggiIncolla(usaAI){var t=$("incT").value;if(!t.trim())return say($("mI"),"Incolla prima il testo del documento.");
+ var loc=INC.leggi(t),fine=function(P,nota){
+  if(!P.length)return say($("mI"),(nota||(loc.note[0]||"Non ho trovato dati nel testo."))+" Prova a incollare anche le righe con <<<, oppure compila a mano.");
+  P.forEach(function(p){aggiungi(daTesto(p))});$("incT").value="";ESITI=null;controlla();render();
+  var sp=document.getElementById("ospiti").lastElementChild;if(sp)sp.scrollIntoView({behavior:"smooth",block:"start"});
+  var dub=0;G.forEach(function(g){dub+=Object.keys(g.dubbi||{}).length});
+  say($("mI"),"Letto: "+P.length+" person"+(P.length===1?"a":"e")+". "+(dub||AVV.length?"Guarda i campi in giallo e i messaggi sotto i campi.":"Controlli superati: nessun campo dubbio."),!dub)};
+ if(!usaAI)return fine(loc.persone);
+ say($("mI"),"Confronto con l'AI…",true);
+ api("POST","leggi_testo",{testo:t.slice(0,8000)}).then(function(j){var P=loc.persone.slice();
+  (j.persone||[]).forEach(function(a,i){var l=P[i];if(!l){P.push(a);return}
+   var dif=INC.confronta(l,a);l.dubbi=(l.dubbi||[]).concat(dif.map(function(d){return CHIAVE[d]||d}));
+   ["cognome","nome","sesso","data_nascita","numero_documento","comune_nascita","provincia_nascita","stato_nascita","cittadinanza","tipo_documento","rilascio_comune","rilascio_stato"].forEach(function(k){if(!l[k]&&a[k])l[k]=a[k]});
+   l.avvisi=(l.avvisi||[]).concat(dif.length?["Lettura locale e AI non coincidono su: "+dif.join(", ")+"."]:[])});
+  fine(P)}).catch(function(e){say($("mI"),e.code==="ai_mancante"?"L'AI non è collegata: uso solo la lettura sul telefono.":"L'AI non ha risposto: uso solo la lettura sul telefono.");fine(loc.persone)})}
+$("incGo").onclick=function(){leggiIncolla(false)};
+$("incAi").onclick=function(){leggiIncolla(true)};
+$("incPul").onclick=function(){$("incT").value="";say($("mI"),"",true)};
+
 /* ---------- schedine nel formato ufficiale ---------- */
 function pad(s,n){s=norm(s);return(s+" ".repeat(n)).slice(0,n)}
 function bl(n){return" ".repeat(n)}
 function dataIt(isoD){var p=isoD.split("-");return p[2]+"/"+p[1]+"/"+p[0]}
 function dataOk(s){var m=/^(\d\d)\/(\d\d)\/(\d{4})$/.exec(s||"");if(!m)return false;var d=new Date(+m[3],m[2]-1,+m[1]);return d.getDate()===+m[1]&&d.getMonth()===m[2]-1&&d<=new Date()&&+m[3]>1900}
-function controlla(){var bad=[],a=$("arr").value,n=+$("notti").value;
- if(!a)bad.push("il giorno di arrivo");if(!(n>=1&&n<=30))bad.push("le notti (da 1 a 30)");if(!G.length)bad.push("almeno un ospite");
+var AVV=[];
+function controlla(){var bad=[],a=$("arr").value;AVV=[];
+ var ins=CTL.insieme(G,{arrivo:a,notti:$("notti").value,docTabella:ST.tab?TAB.doc:null,comuniN:TAB.stati.length+TAB.comuni.length});
+ ins.err.forEach(function(t){bad.push(t.charAt(0).toLowerCase()+t.slice(1))});AVV=AVV.concat(ins.avv);
  if(TAB.app.length&&!$("app").value)bad.push("l'appartamento");
- G.forEach(function(g,i){var m={};["cognome","nome","sesso","statoN","citt"].forEach(function(k){if(!String(g[k]||"").trim())m[k]=1});
-  if(!dataOk(g.nascita))m.nascita=1;if(g.statoN===ITALIA&&!g.comuneN)m.comuneN=1;
-  if(i===0){if(!g.doc)m.doc=1;if(!String(g.num).trim())m.num=1;if(!g.ril)m.ril=1}
-  g._manca=m;if(Object.keys(m).length)bad.push("i campi in rosso di "+((g.cognome+" "+g.nome).trim()||"ospite "+(i+1)))});
+ G.forEach(function(g,i){var r=CTL.ospite(g,{arrivo:a,capo:i===0,perCodice:perCodice,doc:TAB.doc}),nome=(g.cognome+" "+g.nome).trim()||"ospite "+(i+1);
+  g._manca={};g._msg=r.err;g._avv=r.avv;Object.keys(r.err).forEach(function(k){g._manca[k]=1});
+  if(Object.keys(r.err).length)bad.push("i campi in rosso di "+nome);
+  Object.keys(r.avv).forEach(function(k){AVV.push(nome+" · "+F[k]+": "+r.avv[k])})});
  return bad}
 function schedine(){var arr=dataIt($("arr").value),n=String(+$("notti").value).padStart(2,"0"),app=TAB.app.length?($("app").value+"      ").slice(0,6):"";
  return G.map(function(g,i){var capo=i===0,c=g.comuneN?perCodice(g.comuneN):null,it=g.statoN===ITALIA;
@@ -331,14 +396,14 @@ function invio(azione){$("conf").hidden=true;var bad=controlla();if(bad.length){
  if(!ST.portale)return say($("mS"),"Collega prima il portale in «Collegamenti».");
  var R=schedine();$("bVer").disabled=$("bInv").disabled=true;say($("mS"),azione==="invia"?"Invio alla Questura…":"Verifica con il portale…",true);
  api("POST",azione,{righe:R,arrivo:$("arr").value}).then(function(j){ESITI=j.righe.slice();ESITI.inviata=azione==="invia"&&j.ok;render();
-  if(azione==="verifica")say($("mS"),j.ok?"✓ Il portale le accetta tutte ("+j.valide+"). Niente è stato inviato: ora puoi inviare.":"Il portale ne accetta "+j.valide+" su "+j.totali+": correggi quelle segnate e verifica di nuovo.",j.ok);
+  if(azione==="verifica")say($("mS"),j.ok?"✓ Controlli sul telefono e sul server superati, e il portale le accetta tutte ("+j.valide+")."+(AVV.length?" Avvisi: "+AVV.length+".":"")+" Niente è stato inviato: ora puoi inviare.":"Il portale ne accetta "+j.valide+" su "+j.totali+": correggi quelle segnate e verifica di nuovo.",j.ok);
   else if(j.ok){say($("mS"),"✅ Inviate alla Questura: "+j.valide+" schedin"+(j.valide===1?"a":"e")+". La ricevuta sarà pronta da domani.",true);G=[];ESITI=null;render();caricaStato()}
   else say($("mS"),"Inviate "+j.valide+" su "+j.totali+": le altre sono state rifiutate, correggile e inviale di nuovo.")})
  .catch(function(e){say($("mS"),{non_collegato:"Collega prima il portale.",credenziali:"Il portale non accetta le credenziali: "+e.detail,rete:e.detail,portale:"Il portale risponde con un errore: "+e.detail,schedine:e.detail}[e.code]||"Non riuscito. Riprova.")})
  .then(function(){$("bVer").disabled=$("bInv").disabled=false})}
 $("bVer").onclick=function(){invio("verifica")};
 $("bInv").onclick=function(){var bad=controlla();if(bad.length){render();return say($("mS"),"Manca: "+bad.join(", ")+".")}
- $("confT").textContent="Invio "+G.length+" schedin"+(G.length===1?"a":"e")+" alla Questura: arrivo "+dataIt($("arr").value)+", "+$("notti").value+" nott"+(+$("notti").value===1?"e":"i")+". Confermi?";
+ $("confT").textContent="Invio "+G.length+" schedin"+(G.length===1?"a":"e")+" alla Questura: arrivo "+dataIt($("arr").value)+", "+$("notti").value+" nott"+(+$("notti").value===1?"e":"i")+"."+(AVV.length?" Attenzione, "+AVV.length+" avvis"+(AVV.length===1?"o":"i")+": "+AVV.slice(0,3).join(" · ")+(AVV.length>3?" …":""):" Controlli superati.")+" Confermi?";render();
  $("conf").hidden=false;$("conf").scrollIntoView({behavior:"smooth",block:"center"})};
 $("confNo").onclick=function(){$("conf").hidden=true};
 $("confSi").onclick=function(){invio("invia")};
