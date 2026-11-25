@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#17464d">
+<title>Alloggiati Web · Pio XI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700&display=swap">
+<style>
+:root{--bg:#17464d;--panel:rgba(255,255,255,.06);--line:rgba(244,236,218,.16);--fg:#f4ecda;--mute:rgba(244,236,218,.7);--gold:#f0c178;--good:#9fd3a4;--bad:#f2a49a;--warn:#ffd27a;--fd:"Cormorant Garamond",Georgia,serif;--fb:"Nunito Sans",system-ui,-apple-system,sans-serif;color-scheme:dark}
+*{box-sizing:border-box}
+html{background:#1f3a48}
+body{margin:0;min-height:100vh;background:linear-gradient(170deg,#17464d 0%,#203a4a 45%,#2c2a45 100%);color:var(--fg);font:16px/1.55 var(--fb)}
+body{padding:max(20px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 130px max(16px,env(safe-area-inset-left))}
+main{max-width:640px;margin:0 auto;display:grid;gap:18px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0 4px}
+h1{font:600 clamp(30px,8vw,40px)/1.05 var(--fd);margin:0}
+h1 small{display:block;font:600 14px var(--fb);color:var(--gold);letter-spacing:.02em;margin-top:4px}
+h2{font:600 26px/1.15 var(--fd);margin:0;text-wrap:balance}
+h3{font:700 16px var(--fb);margin:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:20px;display:grid;gap:14px}
+.card>p{margin:0;color:var(--mute)}
+label{display:grid;gap:6px;font-weight:600;font-size:14px;color:var(--mute);position:relative}
+input,select{font:inherit;font-size:16px;color:var(--fg);background:rgba(10,20,25,.35);border:1px solid var(--line);border-radius:12px;padding:12px 14px;width:100%;min-width:0}
+select option{background:#203a4a}
+input:focus,select:focus,button:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.btn{font:700 16px var(--fb);border:0;border-radius:999px;padding:13px 22px;background:var(--gold);color:#1d2b2c;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px}
+.btn.g{background:transparent;color:var(--fg);border:1px solid var(--line)}
+.btn.s{padding:8px 14px;min-height:40px;font-size:15px}
+.btn.ko{background:transparent;color:var(--bad);border:1px solid rgba(242,164,154,.4)}
+.btn:disabled{opacity:.55}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.msg{margin:0;font-weight:600;min-height:1.4em}.msg.ok{color:var(--good)}.msg.ko{color:var(--bad)}
+.hint{font-size:14px;color:var(--mute);margin:0}
+.pill{display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:600;padding:6px 12px;border-radius:99px;background:rgba(255,255,255,.08)}
+.pill i{width:9px;height:9px;border-radius:50%;background:var(--bad)}.pill.on i{background:var(--good)}
+.safe{font-size:14px;color:var(--fg);background:rgba(159,211,164,.08);border:1px solid rgba(159,211,164,.25);border-radius:14px;padding:12px 14px;margin:0}
+details.card>summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:10px}
+details.card>summary::-webkit-details-marker{display:none}
+details.card>summary::after{content:"▾";color:var(--gold);font-size:18px}
+details[open].card>summary::after{content:"▴"}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button{font:600 15px var(--fb);border:1px solid var(--line);background:transparent;color:var(--fg);border-radius:99px;padding:8px 16px;cursor:pointer;min-height:40px}
+.seg button[aria-pressed=true]{background:var(--gold);color:#1d2b2c;border-color:var(--gold)}
+.ospite{border:1px solid var(--line);border-radius:18px;padding:16px;display:grid;gap:12px;background:rgba(10,20,25,.18)}
+.ospite.ok{border-color:rgba(159,211,164,.6)}.ospite.err{border-color:rgba(242,164,154,.7)}
+.o-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.o-top h3 small{display:block;font-weight:600;font-size:13px;color:var(--gold)}
+.thumbs{display:flex;gap:8px;overflow-x:auto}
+.thumbs img{height:84px;border-radius:10px;border:1px solid var(--line);cursor:zoom-in}
+.dubbio input,.dubbio select{border-color:var(--warn);box-shadow:0 0 0 1px var(--warn) inset}
+.dubbio>span.t::after{content:" · controlla";color:var(--warn)}
+.manca input,.manca select{border-color:var(--bad)}
+.esito{font-size:14px;font-weight:600;margin:0}.esito.ok{color:var(--good)}.esito.ko{color:var(--bad)}
+.ac{position:absolute;left:0;right:0;top:100%;z-index:30;margin:4px 0 0;padding:6px;list-style:none;background:#203a4a;border:1px solid var(--line);border-radius:14px;box-shadow:0 14px 34px rgba(0,0,0,.45);max-height:260px;overflow:auto}
+.ac li{padding:10px 12px;border-radius:10px;cursor:pointer;color:var(--fg);font-weight:600}
+.ac li small{color:var(--mute);font-weight:400}
+.ac li[aria-selected=true],.ac li:hover{background:rgba(240,193,120,.16)}
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:20;padding:12px max(16px,env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));background:rgba(16,40,46,.94);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid var(--line)}
+.bar>div{max-width:640px;margin:0 auto;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.bar .btn{flex:1 1 140px}
+.conf{border:1px solid var(--gold);border-radius:16px;padding:14px;display:grid;gap:10px;background:rgba(240,193,120,.08)}
+.log{display:grid;gap:6px;font-size:14px;color:var(--mute);margin:0;padding:0;list-style:none;font-variant-numeric:tabular-nums}
+.drop{display:grid;place-items:center;gap:6px;text-align:center;border:1.5px dashed rgba(240,193,120,.55);border-radius:18px;padding:22px 16px;cursor:pointer;color:var(--fg);background:rgba(240,193,120,.05)}
+.drop b{font-size:18px}.drop span{font-size:14px;color:var(--mute)}
+.drop input{position:absolute;width:1px;height:1px;opacity:0}
+.zoom{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.9);display:grid;place-items:center;padding:16px}
+.zoom img{max-width:100%;max-height:100%;border-radius:10px}
+[hidden]{display:none!important}
+@media (max-width:480px){.grid2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+<header><h1>Alloggiati Web<small>Comunicazione degli ospiti alla Questura</small></h1><a class="btn g s" href="/admin/">← Pannello</a></header>
+
+<p class="safe" id="nota">🔒 Foto e dati degli ospiti non vengono salvati sul sito: restano su questo telefono finché la pagina è aperta e vanno solo al portale della Polizia di Stato e, per la lettura automatica, all'AI (Claude, di Anthropic). Come chiede il portale, i dati si prendono dal documento con l'ospite presente.</p>
+
+<details class="card" id="cfg">
+ <summary><h2>Collegamenti</h2><span class="row" style="gap:6px"><span class="pill" id="pPort"><i></i><span>Portale</span></span><span class="pill" id="pAi"><i></i><span>Lettura AI</span></span></span></summary>
+ <div style="display:grid;gap:12px">
+  <h3>Portale Alloggiati Web</h3>
+  <div id="portOff" style="display:grid;gap:12px">
+   <label>Utente<input type="text" id="cU" autocomplete="off" autocapitalize="characters" spellcheck="false"></label>
+   <label>Password<input type="password" id="cP" autocomplete="off"></label>
+   <label>Chiave Web Service (WSKEY)<input type="password" id="cK" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+   <p class="hint">La WSKEY si crea sul portale: tocca il tuo nome in alto a destra → "Chiave Web Service" → genera. A ogni cambio della password del portale va creata di nuovo. Le credenziali restano solo sul server, nessuno le può rileggere.</p>
+   <div class="row"><button class="btn" type="button" id="cSave">Collega e prova</button></div>
+  </div>
+  <div id="portOn" hidden style="display:grid;gap:10px">
+   <p class="hint" id="portTxt"></p>
+   <div class="row"><button class="btn g s" type="button" id="tabUpd">Aggiorna le tabelle</button><button class="btn ko s" type="button" id="cDel">Scollega</button></div>
+  </div>
+  <p class="msg" id="mC" role="status"></p>
+  <h3 style="margin-top:8px">Lettura dei documenti con l'AI</h3>
+  <div id="aiOff" style="display:grid;gap:12px">
+   <label>Chiave API di Anthropic (inizia con sk-ant-)<input type="password" id="aK" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="sk-ant-…"></label>
+   <p class="hint">console.anthropic.com → API Keys → Create Key. Si paga a consumo, con credito caricato prima: il costo di ogni lettura lo vedi nella console. Resta solo sul server.</p>
+   <div class="row"><button class="btn" type="button" id="aSave">Collega</button></div>
+  </div>
+  <div id="aiOn" hidden class="row"><span class="hint" id="aiTxt">Lettura attiva.</span><button class="btn ko s" type="button" id="aDel">Scollega</button></div>
+  <p class="msg" id="mA" role="status"></p>
+ </div>
+</details>
+
+<section class="card" id="nuova">
+ <h2>Nuova comunicazione</h2>
+ <div class="grid2">
+  <label>Giorno di arrivo<input type="date" id="arr"></label>
+  <label>Notti<input type="number" id="notti" inputmode="numeric" min="1" max="30" step="1" value="1"></label>
+ </div>
+ <p class="hint" id="arrAvv" hidden></p>
+ <label id="appL" hidden>Appartamento<select id="app"></select></label>
+ <div id="tipoBox" hidden style="display:grid;gap:8px">
+  <span class="hint">Più ospiti insieme: sono</span>
+  <div class="seg" id="tipo"><button type="button" data-t="g" aria-pressed="true">Un gruppo</button><button type="button" data-t="f" aria-pressed="false">Una famiglia</button></div>
+ </div>
+ <div id="ospiti" style="display:grid;gap:14px"></div>
+ <label class="drop" id="drop"><b>📷 Fotografa i documenti</b><span>Uno o più documenti, anche fronte e retro: li leggo e compilo io. Poi controlli tu.</span><input type="file" id="foto" accept="image/*" multiple></label>
+ <div class="row"><button class="btn g s" type="button" id="aMano">✍️ Aggiungi un ospite a mano</button><p class="msg" id="mL" role="status"></p></div>
+ <div id="conf" class="conf" hidden>
+  <b id="confT"></b>
+  <div class="row"><button class="btn" type="button" id="confSi">Sì, invia alla Questura</button><button class="btn g s" type="button" id="confNo">Annulla</button></div>
+ </div>
+ <p class="msg" id="mS" role="status" aria-live="polite"></p>
+</section>
+
+<section class="card">
+ <h2>Ricevute</h2>
+ <p>La ricevuta di un giorno il portale la prepara dal giorno dopo.</p>
+ <div class="row"><label style="flex:1 1 180px">Giorno dell'invio<input type="date" id="rData"></label><button class="btn g" type="button" id="rGo" style="align-self:end">Scarica la ricevuta</button></div>
+ <p class="msg" id="mR" role="status"></p>
+ <h3>Ultimi invii</h3>
+ <ul class="log" id="log"><li>Nessun invio da qui.</li></ul>
+</section>
+</main>
+
+<div class="bar" id="bar" hidden><div>
+ <button class="btn g" type="button" id="bVer">Verifica</button>
+ <button class="btn" type="button" id="bInv">Invia alla Questura</button>
+</div></div>
+
+<script>
+(function(){
+"use strict";
+var $=function(i){return document.getElementById(i)};
+function api(m,p,b){return fetch("/api/admin/aw/"+p,{method:m,credentials:"same-origin",headers:{"Content-Type":"application/json","X-PX":"1"},body:b?JSON.stringify(b):undefined}).then(function(r){return r.json().catch(function(){return{}}).then(function(j){if(!r.ok){var e=new Error(j.error||r.status);e.code=j.error;e.detail=j.detail||"";e.status=r.status;throw e}return j})})}
+function say(el,t,ok){el.textContent=t;el.className="msg "+(ok?"ok":"ko")}
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
+function iso(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+var ITALIA="100000100",ST={},TAB={stati:[],comuni:[],doc:[],app:[]};
+
+/* ---------- tabelle ufficiali (comuni, stati, documenti, appartamenti) ---------- */
+function norm(s){return String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase().replace(/[^A-Z0-9' ]+/g," ").replace(/\s+/g," ").trim()}
+function righe(t){return String(t||"").replace(/\r/g,"").split("\n").filter(function(l){return l.trim()}).map(function(l){return l.split(";").map(function(x){return x.trim().replace(/^"(.*)"$/,"$1")})})}
+function colonne(rows,test){var h=(rows[0]||[]).map(function(x){return x.toLowerCase()}),testa=h.some(function(x){return /codice|descriz|^id/.test(x)});return{testa:testa,h:h}}
+function leggiLuoghi(t){var R=righe(t);if(!R.length)return;var k=colonne(R),iC,iD,iP,iF;
+ if(k.testa){iC=k.h.findIndex(function(x){return /codice/.test(x)});iD=k.h.findIndex(function(x){return /descr/.test(x)});iP=k.h.findIndex(function(x){return /prov|sigla/.test(x)});iF=k.h.findIndex(function(x){return /fine|cess/.test(x)});R=R.slice(1)}
+ else{var r0=R.find(function(r){return r.some(function(x){return /^\d{9}$/.test(x)})})||R[0];iC=r0.findIndex(function(x){return /^\d{9}$/.test(x)});iP=r0.findIndex(function(x,i){return i!==iC&&/^[A-Z]{2}$/.test(x)});
+  iD=r0.findIndex(function(x,i){return i!==iC&&i!==iP&&/[A-Za-z]{3}/.test(x)});iF=r0.length>3?[0,1,2,3,4,5].find(function(i){return i<r0.length&&i!==iC&&i!==iD&&i!==iP}):-1;if(iF==null)iF=-1}
+ R.forEach(function(r){var c=r[iC],n=r[iD];if(!/^\d{9}$/.test(c||"")||!n)return;var f=iF>=0?(r[iF]||""):"",o={c:c,n:n.toUpperCase(),k:norm(n),p:iP>=0?(r[iP]||"").toUpperCase():"",x:!!f&&f!=="0"};
+  (/^100000/.test(c)?TAB.stati:TAB.comuni).push(o)})}
+function leggiDoc(t){righe(t).forEach(function(r){var i=r.findIndex(function(x){return /^[A-Z0-9]{5}$/.test(x)});if(i<0)return;var d=r.find(function(x,j){return j!==i&&/[A-Za-z]{3}/.test(x)})||r[i];TAB.doc.push({c:r[i],n:d.toUpperCase()})})}
+function leggiApp(t){righe(t).forEach(function(r){var i=r.findIndex(function(x){return /^\d{1,6}$/.test(x)});if(i<0)return;TAB.app.push({c:r[i],n:r.filter(function(x,j){return j!==i&&x}).join(" · ")||("Appartamento "+r[i])})})}
+var DOC_BASE=[{c:"IDENT",n:"CARTA DI IDENTITA'"},{c:"IDELE",n:"CARTA IDENTITA' ELETTRONICA"},{c:"PASOR",n:"PASSAPORTO ORDINARIO"},{c:"PATEN",n:"PATENTE DI GUIDA"}];
+function caricaTabelle(){return api("GET","tabelle").then(function(j){TAB={stati:[],comuni:[],doc:[],app:[]};
+ if(j.luoghi)leggiLuoghi(j.luoghi);if(j.documenti)leggiDoc(j.documenti);if(j.appartamenti)leggiApp(j.appartamenti);if(!TAB.doc.length)TAB.doc=DOC_BASE.slice();
+ [TAB.stati,TAB.comuni].forEach(function(L){L.sort(function(a,b){return a.x-b.x||a.n.localeCompare(b.n)})});
+ ST.tab=j.info;var s=$("app");s.innerHTML="";TAB.app.forEach(function(a){var o=document.createElement("option");o.value=a.c;o.textContent=a.n;s.appendChild(o)});$("appL").hidden=!TAB.app.length;
+ render()})}
+var SIN={"STATI UNITI":"STATI UNITI D'AMERICA","USA":"STATI UNITI D'AMERICA","GRAN BRETAGNA":"REGNO UNITO","INGHILTERRA":"REGNO UNITO","OLANDA":"PAESI BASSI","RUSSIA":"FEDERAZIONE RUSSA","REPUBBLICA CECA":"CECA, REPUBBLICA","CINA":"CINESE, REPUBBLICA POPOLARE","COREA DEL SUD":"COREA, REPUBBLICA (COREA DEL SUD)"};
+function trova(L,nome,prov){var k=norm(nome);if(!k)return null;var s=SIN[k];
+ var es=L.filter(function(o){return o.k===k||(s&&o.k===norm(s))});if(prov){var ep=es.filter(function(o){return o.p===prov});if(ep.length)es=ep}
+ if(es.length)return es.find(function(o){return!o.x})||es[0];
+ var pa=L.filter(function(o){return!o.x&&(o.k.indexOf(k)===0||k.indexOf(o.k)===0)});return pa.length===1?pa[0]:null}
+function cerca(L,q){var k=norm(q);if(!k)return[];var a=[],b=[];for(var i=0;i<L.length&&a.length<12;i++){var o=L[i];if(o.k.indexOf(k)===0)a.push(o);else if(b.length<12&&o.k.indexOf(k)>0)b.push(o)}return a.concat(b).slice(0,8)}
+function etich(o){return o?o.n+(o.p&&o.p!=="EE"?" ("+o.p+")":"")+(o.x?" · cessato":""):""}
+function perCodice(c){if(!c)return null;var L=/^100000/.test(c)?TAB.stati:TAB.comuni;for(var i=0;i<L.length;i++)if(L[i].c===c)return L[i];return null}
+
+/* ---------- ospiti (solo in memoria) ---------- */
+var G=[],seq=0,tipo="g",ESITI=null;
+function nuovo(p){p=p||{};return{id:++seq,cognome:p.cognome||"",nome:p.nome||"",sesso:p.sesso||"",nascita:p.data_nascita||"",statoN:"",comuneN:"",citt:"",doc:"",num:p.numero_documento||"",ril:"",foto:p.foto||[],dubbi:{}}}
+function daAI(p,foto){var g=nuovo(p);g.foto=foto;(p.dubbi||[]).forEach(function(d){g.dubbi[d]=1});
+ var sn=trova(TAB.stati,p.stato_nascita||(p.comune_nascita?"ITALIA":""));if(sn)g.statoN=sn.c;else if(p.stato_nascita)g.dubbi.stato_nascita=1;
+ if(g.statoN===ITALIA){var cn=trova(TAB.comuni,p.comune_nascita,(p.provincia_nascita||"").toUpperCase());if(cn)g.comuneN=cn.c;else g.dubbi.comune_nascita=1}
+ var ci=trova(TAB.stati,p.cittadinanza);if(ci)g.citt=ci.c;else if(p.cittadinanza)g.dubbi.cittadinanza=1;
+ var d=TAB.doc.find(function(x){return x.c===p.tipo_documento});if(d)g.doc=d.c;else if(p.tipo_documento)g.dubbi.tipo_documento=1;
+ var rs=norm(p.rilascio_stato),rl=null;if(p.rilascio_comune&&(!rs||rs==="ITALIA"))rl=trova(TAB.comuni,p.rilascio_comune);if(!rl&&rs&&rs!=="ITALIA")rl=trova(TAB.stati,p.rilascio_stato);
+ if(rl)g.ril=rl.c;else if(p.rilascio_comune||p.rilascio_stato)g.dubbi.rilascio=1;
+ return g}
+function capoTipo(){return G.length<2?"16":tipo==="f"?"17":"18"}
+function membroTipo(){return tipo==="f"?"19":"20"}
+var F={cognome:"Cognome",nome:"Nome",sesso:"Sesso",nascita:"Data di nascita",statoN:"Stato di nascita",comuneN:"Comune di nascita",citt:"Cittadinanza",doc:"Documento",num:"Numero del documento",ril:"Rilasciato a"};
+function campo(g,k,html,dubbio){var cls=(dubbio?" dubbio":"")+(g._manca&&g._manca[k]?" manca":"");return'<label class="'+cls+'"><span class="t">'+F[k]+"</span>"+html+"</label>"}
+function render(){var box=$("ospiti");box.innerHTML="";$("tipoBox").hidden=G.length<2;$("bar").hidden=!G.length;
+ G.forEach(function(g,i){var capo=i===0,d=document.createElement("div");d.className="ospite"+(ESITI&&ESITI[i]?(ESITI[i].ok?" ok":" err"):"");d.dataset.id=g.id;
+  var ruolo=G.length<2?"Ospite singolo":capo?(tipo==="f"?"Capofamiglia":"Capogruppo"):(tipo==="f"?"Familiare":"Membro del gruppo");
+  var h='<div class="o-top"><h3>'+(esc((g.cognome+" "+g.nome).trim())||"Ospite "+(i+1))+"<small>"+ruolo+'</small></h3><div class="row" style="gap:6px">'+(capo?"":'<button class="btn g s" type="button" data-a="capo">Rendi '+(tipo==="f"?"capofamiglia":"capogruppo")+"</button>")+'<button class="btn ko s" type="button" data-a="via" aria-label="Togli ospite">✕</button></div></div>';
+  if(g.foto.length)h+='<div class="thumbs">'+g.foto.map(function(u,j){return'<img src="'+u+'" alt="Documento, foto '+(j+1)+'" data-z="'+j+'">'}).join("")+"</div>";
+  if(ESITI&&ESITI[i]&&!ESITI[i].ok)h+='<p class="esito ko">⚠️ '+esc(ESITI[i].errore)+"</p>";else if(ESITI&&ESITI[i])h+='<p class="esito ok">✓ '+(ESITI.inviata?"Inviata":"Va bene")+"</p>";
+  h+='<div class="grid2">'+campo(g,"cognome",'<input type="text" data-k="cognome" autocomplete="off" autocapitalize="characters" maxlength="50">',g.dubbi.cognome)+campo(g,"nome",'<input type="text" data-k="nome" autocomplete="off" autocapitalize="characters" maxlength="30">',g.dubbi.nome)+"</div>";
+  h+='<div class="grid2">'+campo(g,"sesso",'<select data-k="sesso"><option value="">—</option><option value="M">Maschio</option><option value="F">Femmina</option></select>',g.dubbi.sesso)+campo(g,"nascita",'<input type="text" data-k="nascita" inputmode="numeric" placeholder="gg/mm/aaaa" maxlength="10" autocomplete="off">',g.dubbi.data_nascita)+"</div>";
+  h+=campo(g,"statoN",'<input type="text" data-ac="statoN" autocomplete="off" placeholder="Scrivi e scegli">',g.dubbi.stato_nascita);
+  if(g.statoN===ITALIA)h+=campo(g,"comuneN",'<input type="text" data-ac="comuneN" autocomplete="off" placeholder="Scrivi e scegli">',g.dubbi.comune_nascita);
+  h+=campo(g,"citt",'<input type="text" data-ac="citt" autocomplete="off" placeholder="Scrivi e scegli">',g.dubbi.cittadinanza);
+  if(capo){h+='<div class="grid2">'+campo(g,"doc",'<select data-k="doc"><option value="">—</option>'+TAB.doc.map(function(o){return'<option value="'+esc(o.c)+'">'+esc(o.n)+"</option>"}).join("")+"</select>",g.dubbi.tipo_documento)+campo(g,"num",'<input type="text" data-k="num" autocomplete="off" autocapitalize="characters" maxlength="20" spellcheck="false">',g.dubbi.numero_documento)+"</div>";
+   h+=campo(g,"ril",'<input type="text" data-ac="ril" autocomplete="off" placeholder="Comune o stato">',g.dubbi.rilascio)}
+  d.innerHTML=h;box.appendChild(d);
+  [].forEach.call(d.querySelectorAll("[data-k]"),function(el){el.value=g[el.dataset.k]||"";el.addEventListener("input",function(){g[el.dataset.k]=el.value;togliDubbio(g,el);if(el.dataset.k==="cognome"||el.dataset.k==="nome")d.querySelector("h3").firstChild.textContent=(g.cognome+" "+g.nome).trim()||"Ospite "+(i+1)})});
+  [].forEach.call(d.querySelectorAll("[data-ac]"),function(el){var k=el.dataset.ac;el.value=etich(perCodice(g[k]));ac(el,k==="comuneN"?TAB.comuni:k==="ril"?TAB.comuni.concat(TAB.stati):TAB.stati,function(o){g[k]=o.c;togliDubbio(g,el);if(k==="statoN"){if(o.c!==ITALIA)g.comuneN="";render()}})});
+ })}
+function togliDubbio(g,el){var l=el.closest("label");if(l)l.classList.remove("dubbio","manca");ESITI=null}
+$("ospiti").addEventListener("click",function(e){var b=e.target.closest("[data-a]"),im=e.target.closest("img[data-z]"),d=e.target.closest(".ospite");if(!d)return;var i=G.findIndex(function(g){return g.id===+d.dataset.id});
+ if(im){var z=document.createElement("div");z.className="zoom";z.innerHTML='<img alt="">';z.firstChild.src=im.src;z.onclick=function(){z.remove()};document.body.appendChild(z);return}
+ if(!b)return;ESITI=null;if(b.dataset.a==="via")G.splice(i,1);else if(b.dataset.a==="capo"){var g=G.splice(i,1)[0];G.unshift(g)}render()});
+
+/* scelta da un elenco lungo (comuni, stati): si scrive e si tocca */
+function ac(input,L,pick){var ul=null,sel=-1,res=[];
+ function chiudi(){if(ul){ul.remove();ul=null}sel=-1}
+ function apri(){chiudi();res=cerca(L,input.value);if(!res.length)return;ul=document.createElement("ul");ul.className="ac";ul.setAttribute("role","listbox");
+  res.forEach(function(o,j){var li=document.createElement("li");li.setAttribute("role","option");li.innerHTML=esc(o.n)+(o.p&&o.p!=="EE"?" <small>("+esc(o.p)+")</small>":"")+(o.x?" <small>· cessato</small>":"");
+   li.addEventListener("pointerdown",function(ev){ev.preventDefault();input.value=etich(o);chiudi();pick(o)});ul.appendChild(li)});input.parentNode.appendChild(ul)}
+ input.addEventListener("input",apri);input.addEventListener("focus",function(){if(input.value)input.select()});
+ input.addEventListener("blur",function(){setTimeout(chiudi,150)});
+ input.addEventListener("keydown",function(e){if(!ul)return;var li=ul.children;if(e.key==="ArrowDown"||e.key==="ArrowUp"){e.preventDefault();sel=(sel+(e.key==="ArrowDown"?1:-1)+li.length)%li.length;[].forEach.call(li,function(x,j){x.setAttribute("aria-selected",j===sel)})}
+  else if(e.key==="Enter"&&sel>=0){e.preventDefault();var o=res[sel];input.value=etich(o);chiudi();pick(o)}else if(e.key==="Escape")chiudi()})}
+
+/* ---------- foto → lettura con l'AI ---------- */
+function comprimi(file){return new Promise(function(ok,no){var u=URL.createObjectURL(file),im=new Image();im.onload=function(){var M=1600,s=Math.min(1,M/Math.max(im.naturalWidth,im.naturalHeight)),c=document.createElement("canvas");c.width=Math.round(im.naturalWidth*s);c.height=Math.round(im.naturalHeight*s);c.getContext("2d").drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);
+  var d=c.toDataURL("image/jpeg",.85);ok({type:"image/jpeg",data:d.split(",")[1],url:d})};im.onerror=function(){URL.revokeObjectURL(u);no(new Error("foto"))};im.src=u})}
+$("foto").addEventListener("change",function(){var fs=[].slice.call(this.files||[]);this.value="";if(!fs.length)return;
+ if(!ST.ai)return say($("mL"),"Per leggere le foto collega prima l'AI in «Collegamenti». Intanto puoi aggiungere l'ospite a mano.");
+ if(fs.length>4){say($("mL"),"Al massimo 4 foto per volta: leggo le prime 4.");fs=fs.slice(0,4)}
+ say($("mL"),"Leggo "+(fs.length>1?"le foto":"la foto")+"…",true);$("drop").style.pointerEvents="none";
+ Promise.all(fs.map(comprimi)).then(function(im){return api("POST","leggi",{immagini:im.map(function(x){return{type:x.type,data:x.data}})}).then(function(j){
+   var urls=im.map(function(x){return x.url});if(!j.persone.length){say($("mL"),"Non ho trovato documenti nelle foto: riprova con più luce, o aggiungi l'ospite a mano.");return}
+   j.persone.forEach(function(p){G.push(daAI(p,j.persone.length===1?urls:[]))});ESITI=null;render();
+   var dub=!!$("ospiti").querySelector(".dubbio");
+   say($("mL"),"Letto"+(j.persone.length>1?": "+j.persone.length+" persone":"")+". "+(dub?"Controlla i campi in giallo.":"Controlla comunque i dati prima di inviare."),true);
+   $("ospiti").lastElementChild.scrollIntoView({behavior:"smooth",block:"start"})})})
+ .catch(function(e){say($("mL"),{limite:"Raggiunto il limite di letture di oggi.",ai_mancante:"Collega prima l'AI in «Collegamenti».",ai_chiave:"La chiave dell'AI non è più valida: ricollegala.",foto:"Questa foto non si apre: prova a fotografare di nuovo."}[e.code||e.message]||e.detail||"Lettura non riuscita: riprova.")})
+ .then(function(){$("drop").style.pointerEvents=""})});
+$("aMano").onclick=function(){G.push(nuovo());ESITI=null;render();var l=$("ospiti").lastElementChild;l.scrollIntoView({behavior:"smooth",block:"start"});l.querySelector("input").focus({preventScroll:true})};
+$("tipo").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;tipo=b.dataset.t;[].forEach.call(this.children,function(x){x.setAttribute("aria-pressed",x===b)});ESITI=null;render()});
+
+/* ---------- schedine nel formato ufficiale ---------- */
+function pad(s,n){s=norm(s);return(s+" ".repeat(n)).slice(0,n)}
+function bl(n){return" ".repeat(n)}
+function dataIt(isoD){var p=isoD.split("-");return p[2]+"/"+p[1]+"/"+p[0]}
+function dataOk(s){var m=/^(\d\d)\/(\d\d)\/(\d{4})$/.exec(s||"");if(!m)return false;var d=new Date(+m[3],m[2]-1,+m[1]);return d.getDate()===+m[1]&&d.getMonth()===m[2]-1&&d<=new Date()&&+m[3]>1900}
+function controlla(){var bad=[],a=$("arr").value,n=+$("notti").value;
+ if(!a)bad.push("il giorno di arrivo");if(!(n>=1&&n<=30))bad.push("le notti (da 1 a 30)");if(!G.length)bad.push("almeno un ospite");
+ if(TAB.app.length&&!$("app").value)bad.push("l'appartamento");
+ G.forEach(function(g,i){var m={};["cognome","nome","sesso","statoN","citt"].forEach(function(k){if(!String(g[k]||"").trim())m[k]=1});
+  if(!dataOk(g.nascita))m.nascita=1;if(g.statoN===ITALIA&&!g.comuneN)m.comuneN=1;
+  if(i===0){if(!g.doc)m.doc=1;if(!String(g.num).trim())m.num=1;if(!g.ril)m.ril=1}
+  g._manca=m;if(Object.keys(m).length)bad.push("i campi in rosso di "+((g.cognome+" "+g.nome).trim()||"ospite "+(i+1)))});
+ return bad}
+function schedine(){var arr=dataIt($("arr").value),n=String(+$("notti").value).padStart(2,"0"),app=TAB.app.length?($("app").value+"      ").slice(0,6):"";
+ return G.map(function(g,i){var capo=i===0,c=g.comuneN?perCodice(g.comuneN):null,it=g.statoN===ITALIA;
+  var r=(capo?capoTipo():membroTipo())+arr+n+pad(g.cognome,50)+pad(g.nome,30)+(g.sesso==="F"?"2":"1")+g.nascita+
+   (it&&c?c.c+(c.p+"  ").slice(0,2):bl(11))+g.statoN+g.citt+(capo?pad(g.doc,5)+pad(g.num,20)+g.ril:bl(34));
+  return r+app})}
+function avvisoArrivo(){var a=$("arr").value,t=new Date(),ieri=new Date(t.getTime()-864e5),ok=a===iso(t)||a===iso(ieri);
+ $("arrAvv").hidden=ok||!a;$("arrAvv").textContent="⚠️ Il portale accetta di solito l'arrivo di oggi o di ieri: con un'altra data la verifica potrebbe dare errore."}
+$("arr").addEventListener("change",function(){avvisoArrivo();ESITI=null});
+function invio(azione){$("conf").hidden=true;var bad=controlla();if(bad.length){render();return say($("mS"),"Manca: "+bad.join(", ")+".")}
+ if(!ST.portale)return say($("mS"),"Collega prima il portale in «Collegamenti».");
+ var R=schedine();$("bVer").disabled=$("bInv").disabled=true;say($("mS"),azione==="invia"?"Invio alla Questura…":"Verifica con il portale…",true);
+ api("POST",azione,{righe:R,arrivo:$("arr").value}).then(function(j){ESITI=j.righe.slice();ESITI.inviata=azione==="invia"&&j.ok;render();
+  if(azione==="verifica")say($("mS"),j.ok?"✓ Il portale le accetta tutte ("+j.valide+"). Niente è stato inviato: ora puoi inviare.":"Il portale ne accetta "+j.valide+" su "+j.totali+": correggi quelle segnate e verifica di nuovo.",j.ok);
+  else if(j.ok){say($("mS"),"✅ Inviate alla Questura: "+j.valide+" schedin"+(j.valide===1?"a":"e")+". La ricevuta sarà pronta da domani.",true);G=[];ESITI=null;render();caricaStato()}
+  else say($("mS"),"Inviate "+j.valide+" su "+j.totali+": le altre sono state rifiutate, correggile e inviale di nuovo.")})
+ .catch(function(e){say($("mS"),{non_collegato:"Collega prima il portale.",credenziali:"Il portale non accetta le credenziali: "+e.detail,rete:e.detail,portale:"Il portale risponde con un errore: "+e.detail,schedine:e.detail}[e.code]||"Non riuscito. Riprova.")})
+ .then(function(){$("bVer").disabled=$("bInv").disabled=false})}
+$("bVer").onclick=function(){invio("verifica")};
+$("bInv").onclick=function(){var bad=controlla();if(bad.length){render();return say($("mS"),"Manca: "+bad.join(", ")+".")}
+ $("confT").textContent="Invio "+G.length+" schedin"+(G.length===1?"a":"e")+" alla Questura: arrivo "+dataIt($("arr").value)+", "+$("notti").value+" nott"+(+$("notti").value===1?"e":"i")+". Confermi?";
+ $("conf").hidden=false;$("conf").scrollIntoView({behavior:"smooth",block:"center"})};
+$("confNo").onclick=function(){$("conf").hidden=true};
+$("confSi").onclick=function(){invio("invia")};
+addEventListener("beforeunload",function(e){if(G.length){e.preventDefault();e.returnValue=""}});
+
+/* ---------- collegamenti ---------- */
+function stato(j){ST=Object.assign(ST,j);
+ $("pPort").classList.toggle("on",!!j.portale);$("pAi").classList.toggle("on",!!j.ai);
+ $("portOff").hidden=!!j.portale;$("portOn").hidden=!j.portale;
+ $("portTxt").textContent=j.portale?"Collegato come "+j.utente+(j.fonte==="cloudflare"?" (dai segreti di Cloudflare)":"")+". "+(j.tabelle?"Tabelle aggiornate il "+new Date(j.tabelle.aggiornate).toLocaleDateString("it")+".":"Tabelle non ancora scaricate."):"";
+ $("cDel").hidden=j.fonte==="cloudflare";
+ $("aiOff").hidden=!!j.ai;$("aiOn").hidden=!j.ai;$("aiTxt").textContent=j.aiFonte==="cloudflare"?"Lettura attiva (chiave nei segreti di Cloudflare).":"Lettura attiva.";$("aDel").hidden=j.aiFonte==="cloudflare";
+ if(!j.portale||!j.ai)$("cfg").open=true;
+ var L=$("log");L.innerHTML="";(j.registro||[]).forEach(function(v){var li=document.createElement("li");li.textContent=new Date(v.ts).toLocaleString("it",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})+" · "+v.valide+"/"+v.n+" schedine"+(v.arrivo?" · arrivo "+dataIt(v.arrivo):"")+(v.valide===v.n?" ✓":" ⚠️");L.appendChild(li)});
+ if(!L.children.length)L.innerHTML="<li>Nessun invio da qui.</li>"}
+function caricaStato(){return api("GET","stato").then(stato)}
+$("cSave").onclick=function(){var b={utente:$("cU").value.trim(),password:$("cP").value,wskey:$("cK").value.trim()};if(!b.utente||!b.password||!b.wskey)return say($("mC"),"Scrivi utente, password e WSKEY.");
+ $("cSave").disabled=true;say($("mC"),"Provo l'accesso al portale…",true);
+ api("PUT","credenziali",b).then(function(j){$("cP").value=$("cK").value="";stato(j);say($("mC"),j.avvisoTabelle?"Collegato, ma le tabelle non sono arrivate: tocca «Aggiorna le tabelle».":"Collegato. Tabelle di comuni, stati e documenti scaricate.",!j.avvisoTabelle);return caricaTabelle()})
+ .catch(function(e){say($("mC"),e.code==="credenziali"?"Il portale non accetta i dati: "+e.detail:e.code==="rete"?e.detail:e.code==="cloudflare"?"Le credenziali sono già nei segreti di Cloudflare.":"Non collegato: "+(e.detail||"riprova."))})
+ .then(function(){$("cSave").disabled=false})};
+$("cDel").onclick=function(){api("DELETE","credenziali").then(function(j){stato(j);say($("mC"),"Portale scollegato: le credenziali sono state cancellate dal server.",true)})};
+$("tabUpd").onclick=function(){$("tabUpd").disabled=true;say($("mC"),"Scarico le tabelle…",true);api("POST","tabelle").then(function(){return caricaTabelle().then(caricaStato)}).then(function(){say($("mC"),"Tabelle aggiornate.",true)}).catch(function(e){say($("mC"),"Non aggiornate: "+(e.detail||"riprova."))}).then(function(){$("tabUpd").disabled=false})};
+$("aSave").onclick=function(){var k=$("aK").value.trim();if(!k)return say($("mA"),"Incolla la chiave.");$("aSave").disabled=true;say($("mA"),"Provo la chiave…",true);
+ api("PUT","ai",{key:k}).then(function(j){$("aK").value="";stato(j);say($("mA"),"Lettura dei documenti attiva.",true)})
+ .catch(function(e){say($("mA"),{formato:"Non sembra una chiave di Anthropic: inizia con sk-ant-.",non_valida:"Anthropic dice che la chiave non è valida.",ai_giu:"Anthropic non risponde: riprova tra poco."}[e.code]||"Non collegata. Riprova.")}).then(function(){$("aSave").disabled=false})};
+$("aDel").onclick=function(){api("DELETE","ai").then(function(j){stato(j);say($("mA"),"Chiave cancellata dal server.",true)})};
+
+/* ---------- ricevute ---------- */
+$("rGo").onclick=function(){var d=$("rData").value;if(!d)return say($("mR"),"Scegli il giorno.");$("rGo").disabled=true;say($("mR"),"Chiedo la ricevuta al portale…",true);
+ fetch("/api/admin/aw/ricevuta?data="+d,{credentials:"same-origin"}).then(function(r){if(r.ok)return r.blob();return r.json().catch(function(){return{}}).then(function(j){throw j})})
+ .then(function(b){var u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download="ricevuta-alloggiati-"+d+".pdf";document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u)},6e4);say($("mR"),"Ricevuta scaricata.",true)})
+ .catch(function(j){say($("mR"),j&&j.detail?j.detail:"Ricevuta non disponibile per quel giorno.")}).then(function(){$("rGo").disabled=false})};
+
+/* ---------- avvio: serve l'accesso al pannello ---------- */
+fetch("/api/admin/me",{credentials:"same-origin"}).then(function(r){return r.json()}).then(function(me){if(!me.admin){location.replace("/admin/");return}
+ var t=new Date();$("arr").value=iso(t);$("rData").value=iso(new Date(t.getTime()-864e5));avvisoArrivo();
+ caricaStato().then(function(){if(ST.tabelle)return caricaTabelle();render()}).catch(function(){say($("mS"),"Server non raggiungibile. Riprova.")})}).catch(function(){location.replace("/admin/")});
+})();
+</script>
+</body>
+</html>

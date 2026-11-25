@@ -1,4 +1,5 @@
 // API del pannello riservato (/admin) e dati pubblici del sito.
+import { alloggiati } from "./alloggiati.js";
 import { COLS, getCol, putJSON, getJSON, getPrezzi, cleanPrezzi, getImp, cleanImp, hashPw, eq, newToken, cookie, isAdmin, stripeKey, validStripeKey } from "../lib/store.js";
 
 const J = (o, status = 200, h = {}) => new Response(JSON.stringify(o), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...h } });
@@ -113,6 +114,7 @@ export async function admin(req, env, path) {
     await env.PX.put("blob:" + id, buf, { metadata: { type } });
     return J({ id, url: "/_blob/" + id });
   }
+  if (path.startsWith("aw/")) return alloggiati(req, env, path.slice(3), m);
   const dm = path.match(/^doc\/([a-z]+)\/([A-Za-z0-9_-]{1,60})$/);
   if (dm && COLS.includes(dm[1]) && (m === "PUT" || m === "DELETE")) {
     const col = await getCol(env, dm[1]);
