@@ -86,9 +86,10 @@ details[open].card>summary::after{content:"▴"}
 
 <section class="card" id="auth" hidden>
  <h2>Accedi</h2>
- <p>La stessa password del pannello. Resti dentro per 30 giorni.</p>
+ <p>La stessa password del pannello. Il telefono può ricordarla, e resti dentro: ogni volta che apri, l'accesso si rinnova per altri 6 mesi.</p>
  <form id="authF" style="display:grid;gap:12px">
-  <label>Password<input type="password" id="pw" autocomplete="current-password" required minlength="8"></label>
+  <input type="text" name="username" autocomplete="username" value="Pio XI" readonly tabindex="-1" aria-hidden="true" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none">
+  <label>Password<input type="password" id="pw" name="password" autocomplete="current-password" required minlength="8"></label>
   <button class="btn" type="submit" id="authB">Entra</button>
   <p class="msg" id="authM" role="status"></p>
  </form>
@@ -103,9 +104,9 @@ details[open].card>summary::after{content:"▴"}
   <h3>Portale Alloggiati Web</h3>
   <div id="portOff" style="display:grid;gap:12px">
    <label>Utente<input type="text" id="cU" autocomplete="off" autocapitalize="characters" spellcheck="false"></label>
-   <label>Password<input type="password" id="cP" autocomplete="off"></label>
+   <label>Password del portale<input type="password" id="cP" autocomplete="off"></label>
    <label>Chiave Web Service (WSKEY)<input type="password" id="cK" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
-   <p class="hint">La WSKEY si crea sul portale: tocca il tuo nome in alto a destra → "Chiave Web Service" → genera. A ogni cambio della password del portale va creata di nuovo. Le credenziali restano solo sul server, nessuno le può rileggere.</p>
+   <p class="hint">Si scrivono una volta sola: restano salvate sul server e non te le chiedo più. La WSKEY si crea sul portale: tocca il tuo nome in alto a destra → "Chiave Web Service" → genera. A ogni cambio della password del portale va creata di nuovo. Le credenziali restano solo sul server, nessuno le può rileggere.</p>
    <div class="row"><button class="btn" type="button" id="cSave">Collega e prova</button></div>
   </div>
   <div id="portOn" hidden style="display:grid;gap:10px">
@@ -356,7 +357,7 @@ function stato(j){ST=Object.assign(ST,j);
 function caricaStato(){return api("GET","stato").then(stato)}
 $("cSave").onclick=function(){var b={utente:$("cU").value.trim(),password:$("cP").value,wskey:$("cK").value.trim()};if(!b.utente||!b.password||!b.wskey)return say($("mC"),"Scrivi utente, password e WSKEY.");
  $("cSave").disabled=true;say($("mC"),"Provo l'accesso al portale…",true);
- api("PUT","credenziali",b).then(function(j){$("cP").value=$("cK").value="";stato(j);say($("mC"),j.avvisoTabelle?"Collegato, ma le tabelle non sono arrivate: tocca «Aggiorna le tabelle».":"Collegato. Tabelle di comuni, stati e documenti scaricate.",!j.avvisoTabelle);return caricaTabelle()})
+ api("PUT","credenziali",b).then(function(j){$("cP").value=$("cK").value="";stato(j);say($("mC"),j.nonProvate?"Salvate. Il portale ora non risponde ("+j.nonProvate+"): le provo al primo invio, non serve riscriverle.":j.avvisoTabelle?"Collegato, ma le tabelle non sono arrivate: tocca «Aggiorna le tabelle».":"Collegato. Tabelle di comuni, stati e documenti scaricate.",!j.avvisoTabelle);return caricaTabelle()})
  .catch(function(e){say($("mC"),e.code==="credenziali"?"Il portale non accetta i dati: "+e.detail:e.code==="rete"?e.detail:e.code==="cloudflare"?"Le credenziali sono già nei segreti di Cloudflare.":"Non collegato: "+(e.detail||"riprova."))})
  .then(function(){$("cSave").disabled=false})};
 $("cDel").onclick=function(){api("DELETE","credenziali").then(function(j){stato(j);say($("mC"),"Portale scollegato: le credenziali sono state cancellate dal server.",true)})};

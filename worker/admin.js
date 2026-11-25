@@ -9,9 +9,11 @@ function sameOrigin(req) {
   const o = req.headers.get("origin");
   return !o || o === new URL(req.url).origin;
 }
+// Lax: il cookie arriva anche aprendo il pannello da un link o dall'icona sul telefono; le modifiche restano protette (stessa origine + X-PX)
 function sessCookie(t, maxAge) {
-  return `pxs=${t}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${maxAge}`;
+  return `pxs=${t}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
 }
+const SESS = 180 * DAY;
 async function tooMany(env, ip) {
   const n = +(await env.PX.get("fail:" + ip)) || 0;
   return n >= 10;
@@ -22,8 +24,8 @@ async function fail(env, ip) {
 }
 async function startSession(env) {
   const t = newToken();
-  await env.PX.put("sess:" + t, "1", { expirationTtl: 30 * DAY });
-  return J({ ok: true }, 200, { "Set-Cookie": sessCookie(t, 30 * DAY) });
+  await env.PX.put("sess:" + t, "1", { expirationTtl: SESS });
+  return J({ ok: true }, 200, { "Set-Cookie": sessCookie(t, SESS) });
 }
 
 export async function publicData(env) {
@@ -47,7 +49,10 @@ export async function admin(req, env, path) {
   if (path === "me") {
     const auth = await env.PX.get("auth", { type: "json" });
     const ok = await isAdmin(req, env);
-    return J({ admin: ok, setup: !auth, stripe: ok ? Boolean(await stripeKey(env)) : undefined });
+    // chi usa il pannello resta dentro: ogni apertura rinnova i 180 giorni
+    const h = {};
+    if (ok) { const t = cookie(req, "pxs"); await env.PX.put("sess:" + t, "1", { expirationTtl: SESS }); h["Set-Cookie"] = sessCookie(t, SESS); }
+    return J({ admin: ok, setup: !auth, stripe: ok ? Boolean(await stripeKey(env)) : undefined }, 200, h);
   }
   if (path === "setup" && m === "POST") {
     if (await env.PX.get("auth")) return J({ error: "exists" }, 409);

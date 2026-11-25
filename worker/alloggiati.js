@@ -41,11 +41,13 @@ export async function alloggiati(req, env, p, m) {
         const b = await req.json().catch(() => ({}));
         const c = { utente: String(b.utente || "").trim(), password: String(b.password || ""), wskey: String(b.wskey || "").trim() };
         if (!c.utente || c.utente.length > 60 || !c.password || c.password.length > 100 || !c.wskey || c.wskey.length > 200) return J({ error: "campi" }, 400);
-        await provaAccesso(c); // salva solo credenziali che il portale accetta
+        // credenziali rifiutate dal portale: non si salvano. Portale che non risponde: si salvano lo stesso, così non vanno riscritte
+        let nonProvate = "";
+        try { await provaAccesso(c); } catch (e) { if (!(e instanceof AwError) || e.code === "credenziali") throw e; nonProvate = e.detail || "nessuna risposta"; }
         await env.PX.put("aw_cred", JSON.stringify({ utente: c.utente, password: c.password, wskey: c.wskey }));
         let tab = "";
-        try { await caricaTabelle(env, c); } catch (e) { tab = (e && e.detail) || "tabelle non scaricate"; }
-        return J({ ...(await stato(env)), avvisoTabelle: tab });
+        if (!nonProvate) { try { await caricaTabelle(env, c); } catch (e) { tab = (e && e.detail) || "tabelle non scaricate"; } }
+        return J({ ...(await stato(env)), avvisoTabelle: tab, nonProvate });
       }
     }
     if (p === "tabelle") {

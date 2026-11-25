@@ -57,7 +57,8 @@ input:focus,button:focus-visible,a:focus-visible{outline:2px solid var(--gold);o
  <h2 id="authT">Accedi</h2>
  <p id="authP">Scrivi la tua password per gestire il sito.</p>
  <form id="authF" class="row" style="display:grid;gap:12px">
-  <label>Password<input type="password" id="pw" autocomplete="current-password" required minlength="8"></label>
+  <input type="text" name="username" autocomplete="username" value="Pio XI" readonly tabindex="-1" aria-hidden="true" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none">
+  <label>Password<input type="password" id="pw" name="password" autocomplete="current-password" required minlength="8"></label>
   <label id="pw2L" hidden>Ripeti la password<input type="password" id="pw2" autocomplete="new-password" minlength="8"></label>
   <button class="btn" type="submit" id="authB">Entra</button>
   <p class="msg" id="authM" role="status"></p>
