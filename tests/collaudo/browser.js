@@ -15,7 +15,7 @@ for (const f of fs.readdirSync(CARTELLA).filter((f) => /\.(png|jpe?g|webp)$/i.te
 // tabelle di prova (codici inventati, nomi veri dei comuni e degli stati)
 const COMUNI = [["ROMA", "RM"], ["MARINO", "RM"], ["FRASCATI", "RM"], ["VELLETRI", "RM"], ["VITERBO", "VT"], ["LECCE", "LE"], ["CREMONA", "CR"], ["TRAPANI", "TP"], ["ASTI", "AT"], ["ALBANO LAZIALE", "RM"], ["SAVONA", "SV"], ["POTENZA", "PZ"], ["CATANIA", "CT"], ["FOGGIA", "FG"], ["GENOVA", "GE"], ["MILANO", "MI"], ["NAPOLI", "NA"]];
 const STATI = ["ITALIA", "REGNO UNITO", "IRLANDA", "FRANCIA", "SPAGNA", "BELGIO", "RUSSIA", "SUD AFRICA", "GRECIA", "GERMANIA", "STATI UNITI D'AMERICA", "SVIZZERA", "AUSTRIA", "PAESI BASSI", "POLONIA", "ROMANIA", "UNIONE SOVIETICA"];
-const luoghi = ["Codice;Descrizione;Provincia;DataFineVal"].concat(COMUNI.map((c, i) => "4" + String(10000000 + i).slice(1) + ";" + c[0] + ";" + c[1] + ";"), STATI.map((s, i) => "100000" + String(100 + i) + ";" + s + ";EE;")).join("\n");
+const luoghi = ["Codice;Descrizione;Provincia;DataFineVal"].concat(COMUNI.map((c, i) => "4" + String(100000000 + i).slice(1) + ";" + c[0] + ";" + c[1] + ";"), STATI.map((s, i) => "100000" + String(100 + i) + ";" + s + ";EE;")).join("\n");
 const documenti = "IDENT;CARTA DI IDENTITA'\nIDELE;CARTA IDENTITA' ELETTRONICA\nPASOR;PASSAPORTO ORDINARIO\nPATEN;PATENTE DI GUIDA";
 function pagina() {
   let s = fs.readFileSync(ROOT + "/admin/alloggiati/index.html", "utf8");

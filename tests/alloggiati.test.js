@@ -45,7 +45,7 @@ ok("CIE su una sola riga (testo copiato da una foto)", () => {
   const p = r.persone[0]; assert.equal(r.persone.length, 1);
   assert.equal(p.cognome, "ROSSI"); assert.equal(p.nome, "MARIO"); assert.equal(p.data_nascita, "10/12/1985");
   assert.equal(p.comune_nascita, "BRESCIA"); assert.equal(p.provincia_nascita, "BS"); assert.equal(p.sesso, "M"); assert.equal(p.cittadinanza, "ITA");
-  assert.equal(p.tipo_documento, "IDENT"); assert.match(p.rilascio_testo, /ROMA/);
+  assert.equal(p.tipo_documento, "IDELE"); // numero CA…: carta elettronica assert.match(p.rilascio_testo, /ROMA/);
 });
 ok("carta d'identità cartacea", () => {
   const r = INC.leggi("COMUNE DI ROMA\nCARTA D'IDENTITA' N° AA 1234567\nCognome ROSSI\nNome MARIO\nnato il 10.12.1985\na BRESCIA (BS)\nCittadinanza ITALIANA\nResidenza ROMA\nStato civile CELIBE\nProfessione IMPIEGATO\nStatura 1.75");
@@ -238,4 +238,19 @@ console.log(n + " prove superate");
   assert.equal(p.cognome, "D'AMATO"); assert.equal(p.nome, "MARTINA"); assert.equal(p.comune_nascita, "TRAPANI"); assert.equal(p.rilascio_comune, "VELLETRI");
   assert.ok(p.dubbi.indexOf("cognome") >= 0 && p.dubbi.indexOf("nome") >= 0, "trovati per posizione: da controllare");
   console.log("ok  CIE senza etichette leggibili: cognome, nome e comune dall'ordine della carta");
+})();
+(function () { // testo copiato dal telefono (Testo dal vivo): etichette spezzate, righe in disordine — dati INVENTATI
+  const us = "IGNATURE OF BEARER/SIGNATURE DU TITULAIRE / FIRMA DEL TITULAR\nPASSPORT\nPASSEPORT / PASAPORTE\nTHE UNITED STATES OF AMERICA\nTypo/Typo/Tipo\nleport/No.\nP\nCode/Code/Codigo\nPassport No/No. du\nUSA\nB12345678\ndo Pasaporte\nSurname/Nom/A\nMILLER\nGiven names/Prónoma/Nombres\nDAVID JAMES\nNationality/Nationalite/Nacionalidad\nUNITED STATES OF AMERICA\nDate of birth/Date de naissance/fecha de necin\n12 MAR 1979\nSex/Sexe/Sexo\nM\nPlace of birth.\nde naissarcarugar\nOHIO, U.S:A\nDate of laal\n03 JUN 2023\nDate\n02 JUN 2033\non/Dateder\nAuthority AutoritalAutoridas\nUNITED STATES DEPARTMENT OF STATE";
+  [{}, { largo: true }].forEach((o) => {
+    const p = INC.leggi(us, o).persone[0];
+    assert.equal(p.cognome, "MILLER"); assert.equal(p.nome, "DAVID JAMES"); assert.equal(p.sesso, "M");
+    assert.equal(p.data_nascita, "12/03/1979", "la data di nascita è la più vecchia, non quella di emissione"); assert.equal(p.cittadinanza, "USA");
+    assert.equal(p.numero_documento, "B12345678"); assert.equal(p.luogo_nascita, "OHIO"); assert.equal(p.stato_nascita, "USA");
+  });
+  const cie = INC.leggi("EPUBBLICA ITALIANA\nCARTA DI IDENTITA / IDENTITY CARD\nCA4830175\nCOMUNE DI\nLUCERA NICIPALITY\nCOGNOME / SUR\nSERRA\nNOME\nRNAME\nNAME\nDAVIDE\nLUOGO E DATA DI NASCITA\nPLACE AND DATE OF BIRTH\nSAN SEVERO (FG) 14.05.1999\nSESSO\nSEX\nM\nCITTADINANZA\nNATIONALITY\nITA", { largo: true });
+  assert.equal(cie.persone.length, 1, "le etichette ripetute non creano un secondo ospite");
+  const c = cie.persone[0];
+  assert.equal(c.cognome, "SERRA"); assert.equal(c.nome, "DAVIDE"); assert.equal(c.numero_documento, "CA48301TS"); assert.equal(c.tipo_documento, "IDELE");
+  assert.equal(c.comune_nascita, "SAN SEVERO"); assert.equal(c.provincia_nascita, "FG");
+  console.log("ok  testo copiato dal telefono: etichette spezzate, «COGNOME / SUR», righe ripetute, date di emissione");
 })();

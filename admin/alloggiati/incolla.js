@@ -86,6 +86,8 @@ function sessoDa(v) { var s = norm(v).split(" ")[0] || ""; if (/^(M|MASCHIO|MALE
 
 function luogoDa(v, r) {
   var s = String(v || "").trim().replace(/[\s,]+\d[\d\s.\/\-]*$/, "").trim(); if (!s) return; // pezzi di data rimasti in coda («LENINGRADO SUN 31 01»)
+  var usa = /^(.*?[A-Za-z]{2}.*?)[\s,]+(U\W?S\W?A\W?|U\W?K\W?|UNITED STATES|UNITED KINGDOM)$/i.exec(sa(s));
+  if (usa) { r.luogo_nascita = norm(usa[1]); r.stato_nascita = /K/i.test(usa[2].replace(/UNITED STATES/i, "")) ? "GBR" : "USA"; return; } // «ILLINOIS, U.S:A», «LONDON, UK»
   var e3 = /^(.*?[A-Za-z]{2}.*?)[\s,]+([A-Z]{3})$/.exec(s); // «LENINGRADO SUN»: le parentesi perse dall'OCR, resta il codice del paese
   if (e3 && (MRZ && MRZ.PAESI && MRZ.PAESI[e3[2]] || /^(SUN|YUG|CSK|DDR)$/.test(e3[2])) && !/^(ROMA|NAPOLI)$/.test(e3[2])) { r.luogo_nascita = norm(e3[1]); r.stato_nascita = e3[2]; return; }
   var m = /^(.*?)[\s,]*[(\[{]\s*([A-Za-z0-9]{2})\s*[)\]}]\s*$/.exec(s);
@@ -530,18 +532,26 @@ function leggi1(testo, opz) {
   var P = [];
   blocchi(t).forEach(function (b) { P = P.concat(leggiBlocco(b)); });
   P = raggruppa(P);
+  // «persone» fatte solo di un'etichetta ripetuta dal copia-incolla (un cognome o un nome e nient'altro): non sono un secondo ospite
+  if (P.length > 1) { var nuc = function (p) { return ["cognome", "nome", "data_nascita", "numero_documento", "sesso", "cittadinanza"].filter(function (k) { return p[k] && !eEtichetta(p[k]); }).length; };
+    var forti = P.filter(function (p) { return nuc(p) >= 3 || p.mrz; }); if (forti.length === 1) P = forti;
+    else if (!forti.length) { // pezzi della stessa persona spezzati dal copia-incolla: se non si contraddicono, è uno solo
+      var K = ["cognome", "nome", "data_nascita", "numero_documento", "sesso", "cittadinanza"], uno = {}, lite = false;
+      P.forEach(function (p) { K.forEach(function (k) { var v = p[k] && !eEtichetta(p[k]) ? p[k] : ""; if (!v) return; if (uno[k] && uno[k] !== v) lite = true; else uno[k] = v; }); });
+      if (!lite) { var base = P[0]; P.slice(1).forEach(function (p) { Object.keys(p).forEach(function (k) { if (!base[k] || (eEtichetta(base[k]) && typeof base[k] === "string")) base[k] = p[k]; }); }); P = [base]; } } }
   if (P.length <= 1 && !OPZ.senzaAncore) { // lettura ad ancore: completa e corregge ciò che le etichette esatte non hanno dato
     var an = ancore(t), q = P[0], nucleoA = ["cognome", "nome", "data_nascita", "sesso", "citt", "numero"].filter(function (k) { return an[k]; }).length;
     if (!q && nucleoA >= 3) { q = { pulizia: [], euristico: [] }; P.push(q); }
     if (q) uniscianc(q, an);
   }
-  var italiano_ = /REPUBBLICA\s+ITALIANA|MINISTERO\s+DELL|CARTA\s+DI\s+IDENTIT/i.test(sa(t));
+  var italiano_ = /R?EPUBBLICA\s+ITALIAN|MINISTERO\s+DELL|CARTA\s+D.?\s*IDENTIT/i.test(sa(t));
   P.forEach(function (p) {
     if (italiano_ && p.numero_documento && !p.mrz) { var nc = String(p.numero_documento).toUpperCase().replace(/[^A-Z0-9]/g, ""), fx = "";
       if (nc.length === 9) fx = fixCie(nc);
       else if (nc.length === 10) for (var z = 2; z < 10 && !fx; z++) fx = fixCie(nc.slice(0, z) + nc.slice(z + 1)) && /^C[A-Z]/.test(nc) ? fixCie(nc.slice(0, z) + nc.slice(z + 1)) : ""; // un carattere in più letto dall'OCR
       if (fx && fx !== nc) { p.numero_documento = fx; (p.euristico = p.euristico || []).push("numero_documento"); } }
     if (p.cittadinanza && !/^[A-Z]{3}$/.test(p.cittadinanza)) { var cc = codicePaese(p.cittadinanza); if (cc) p.cittadinanza = cc; }
+    ["cognome", "nome", "comune_nascita", "luogo_nascita", "rilascio_comune"].forEach(function (k) { if (!p[k] || p.mrz && (k === "cognome" || k === "nome")) return; var pw = String(p[k]).split(/\s+/), bu = pw.filter(function (w) { return !frammentoEtichetta(w); }); if (bu.length < pw.length) p[k] = bu.join(" "); });
     ["comune_nascita", "luogo_nascita", "rilascio_comune"].forEach(function (k) { // «F», «27 ME», «LIEW DE NAISSANCE», «APL AWCIPALITY» non sono luoghi
       if (!p[k]) return; var lv = String(p[k]).trim().replace(/^(?:[A-Z]{1,2}\s+)+(?=[A-Z]{3,})/, function (m0) { return /^(LA|LE|LO|IL|EL|AL|SAN|ST|DE|DI|DEL)\s/.test(m0) ? m0 : ""; });
       var paro = lv.split(/\s+/), brutte = paro.filter(function (w) { return w.length <= 2 && !PARTICELLE.test(w) && !/^(LA|LE|LO|IL|EL|AL|SAN|ST|DE|DI|DEL|SUL|SUR|AM|AN|IN|AU|AUX)$/.test(w); }).length;
@@ -725,7 +735,7 @@ function riga_spazzatura(r) {
   return false;
 }
 var NAZ = { ITALIANA: "ITA", ITALIANO: "ITA", ITALIAN: "ITA", BRITISH: "GBR", IRISH: "IRL", EIREANNACH: "IRL", FRANCAISE: "FRA", FRANCAIS: "FRA", FRENCH: "FRA", ESPANOLA: "ESP", ESPANOL: "ESP", SPANISH: "ESP", DEUTSCH: "DEU", GERMAN: "DEU", OSTERREICH: "AUT", AUSTRIAN: "AUT", SUISSE: "CHE", SWISS: "CHE", BELGE: "BEL", BELGIAN: "BEL", NEDERLANDSE: "NLD", DUTCH: "NLD", PORTUGUESA: "PRT", PORTUGUESE: "PRT", POLSKIE: "POL", POLISH: "POL", ROMANA: "ROU", ROMANIAN: "ROU", AMERICAN: "USA", CANADIAN: "CAN", AUSTRALIAN: "AUS", SLOVENSKA: "SVK", SLOVAK: "SVK", CESKA: "CZE", CZECH: "CZE", HELLENIC: "GRC", GREEK: "GRC", SVENSK: "SWE", SWEDISH: "SWE", DANSK: "DNK", DANISH: "DNK", NORSK: "NOR", NORWEGIAN: "NOR", SUOMI: "FIN", FINNISH: "FIN", MAGYAR: "HUN", HUNGARIAN: "HUN", HRVATSKO: "HRV", CROATIAN: "HRV", UKRAINIAN: "UKR", RUSSIAN: "RUS", ALBANIAN: "ALB", BRAZILIAN: "BRA", BRASILEIRA: "BRA", ARGENTINA: "ARG", MEXICANA: "MEX", CHINESE: "CHN", JAPANESE: "JPN", INDIAN: "IND", MOROCCAN: "MAR", TURKISH: "TUR", ISRAELI: "ISR" };
-var TESTATE = [[/REPUBBLICA\s+ITALIANA|MINISTERO\s+DELL.?\s*INTERNO|PATENTE\s+DI\s+GUIDA/, "ITA"], [/UNITED\s+KINGDOM|GREAT\s+BRITAIN|NORTHERN\s+IRELAND/, "GBR"], [/\bEIRE\b|\bIRELAND\b|IRLANDE/, "IRL"], [/REPUBLIQUE\s+FRAN|CARTE\s+NATIONALE\s+D/, "FRA"], [/REINO\s+DE\s+ESPA|DOCUMENTO\s+NACIONAL\s+DE\s+IDENTIDAD/, "ESP"], [/REPUBLIK\s+OSTERREICH/, "AUT"], [/BUNDESREPUBLIK\s+DEUTSCHLAND/, "DEU"], [/SCHWEIZ|CONFEDERATION\s+SUISSE|SVIZZERA/, "CHE"], [/KONINKRIJK\s+DER\s+NEDERLANDEN|NEDERLAND/, "NLD"], [/BELGIQUE|BELGIE|KINGDOM\s+OF\s+BELGIUM/, "BEL"], [/REPUBLICA\s+PORTUGUESA/, "PRT"], [/RZECZPOSPOLITA\s+POLSKA/, "POL"], [/ROMANIA/, "ROU"], [/SLOVENSKA\s+REPUBLIKA/, "SVK"], [/CESKA\s+REPUBLIKA/, "CZE"], [/UNITED\s+STATES\s+OF\s+AMERICA/, "USA"], [/CANADA/, "CAN"], [/AUSTRALIA/, "AUS"], [/HELLENIC\s+REPUBLIC|ELLINIKI/, "GRC"], [/SVERIGE|SWEDEN/, "SWE"], [/DANMARK|DENMARK/, "DNK"], [/NORGE|NORWAY/, "NOR"], [/SUOMI|FINLAND/, "FIN"], [/MAGYARORSZAG|HUNGARY/, "HUN"], [/REPUBLIKA\s+HRVATSKA/, "HRV"], [/UKRAINE|UKRAINA/, "UKR"], [/REPUBLICA\s+FEDERATIVA\s+DO\s+BRASIL/, "BRA"]];
+var TESTATE = [[/R?EPUBBLICA\s+ITALIAN|MINISTERO\s+DELL.?\s*INTERNO|PATENTE\s+DI\s+GUIDA|CARTA\s+D.?\s*IDENTIT|COMUNE\s+DI\s*\/?\s*MUNICIP/, "ITA"], [/UNITED\s+KINGDOM|GREAT\s+BRITAIN|NORTHERN\s+IRELAND/, "GBR"], [/\bEIRE\b|\bIRELAND\b|IRLANDE/, "IRL"], [/REPUBLIQUE\s+FRAN|CARTE\s+NATIONALE\s+D/, "FRA"], [/REINO\s+DE\s+ESPA|DOCUMENTO\s+NACIONAL\s+DE\s+IDENTIDAD/, "ESP"], [/REPUBLIK\s+OSTERREICH/, "AUT"], [/BUNDESREPUBLIK\s+DEUTSCHLAND/, "DEU"], [/SCHWEIZ|CONFEDERATION\s+SUISSE|SVIZZERA/, "CHE"], [/KONINKRIJK\s+DER\s+NEDERLANDEN|NEDERLAND/, "NLD"], [/BELGIQUE|BELGIE|KINGDOM\s+OF\s+BELGIUM/, "BEL"], [/REPUBLICA\s+PORTUGUESA/, "PRT"], [/RZECZPOSPOLITA\s+POLSKA/, "POL"], [/ROMANIA/, "ROU"], [/SLOVENSKA\s+REPUBLIKA/, "SVK"], [/CESKA\s+REPUBLIKA/, "CZE"], [/UNITED\s+STATES\s+OF\s+AMERICA/, "USA"], [/CANADA/, "CAN"], [/AUSTRALIA/, "AUS"], [/HELLENIC\s+REPUBLIC|ELLINIKI/, "GRC"], [/SVERIGE|SWEDEN/, "SWE"], [/DANMARK|DENMARK/, "DNK"], [/NORGE|NORWAY/, "NOR"], [/SUOMI|FINLAND/, "FIN"], [/MAGYARORSZAG|HUNGARY/, "HUN"], [/REPUBLIKA\s+HRVATSKA/, "HRV"], [/UKRAINE|UKRAINA/, "UKR"], [/REPUBLICA\s+FEDERATIVA\s+DO\s+BRASIL/, "BRA"]];
 function paeseDoc(t) { var s = sa(t).toUpperCase(); for (var i = 0; i < TESTATE.length; i++) if (TESTATE[i][0].test(s)) return TESTATE[i][1]; return ""; }
 function codicePaese(v) { // «ITA», «BRITISH CITIZEN», «EIREANNACH/IRISH», «FRA» → codice a 3 lettere
   var s = sa(v).toUpperCase().replace(/[^A-Z ]+/g, " ").trim(); if (!s) return "";
@@ -744,6 +754,7 @@ function nomeAncora(v) { // valore che sembra un nome: lettere (anche minuscole 
   var lett = (x.match(/[A-Za-z]/g) || []).length, maiu = (x.match(/[A-Z]/g) || []).length;
   if (lett < 2) return "";
   if (maiu / lett < 0.5 && !/^([A-Z][a-z'\-]*[A-Za-z'\-]*[ \-]?)+$/.test(x.replace(/\s+/g, " "))) return ""; // «leri», «eco»: rumore minuscolo
+  var pw = x.split(/\s+/), buone = pw.filter(function (w) { return !frammentoEtichetta(w); }); if (!buone.length) return ""; if (buone.length < pw.length) x = buone.join(" ");
   var tk = tokRiga(x); if (ancoreRiga(tk).length) return ""; // è un'etichetta
   if (tk.some(function (w) { return /^(REPUBLIC|REPUBBLICA|REPUBLIQUE|REPUBLICA|REPUBLIK|BUNDESREPUBLIK|KINGDOM|REGNO|REINO|ROYAUME|KONINKRIJK|CARD|CARTA|CARTE|TARJETA|KARTE|PASSPORT|PASSAPORTO|PASSEPORT|PASAPORTE|REISEPASS|PERMIT|LICENCE|LICENSE|PATENTE|MINISTERO|MINISTRY|DOCUMENT|DOCUMENTO|IDENTITY|IDENTITA|IDENTITE|IDENTIDAD|NATIONAL|NAZIONALE|NACIONAL|UNION|EUROPEA|EUROPEAN|STATE|STATES|ESTADO|MUNICIPALITY|COMUNE)$/.test(w.w); })) return ""; // intestazioni del documento
   if (sembraEtichetta(x)) return "";
@@ -752,6 +763,13 @@ function nomeAncora(v) { // valore che sembra un nome: lettere (anche minuscole 
 }
 var PAROLE_ET = []; Object.keys(VOC).forEach(function (k) { VOC[k].forEach(function (f) { f.split(" ").forEach(function (w) { if (w.length >= 5 && PAROLE_ET.indexOf(w) < 0) PAROLE_ET.push(w); }); }); });
 ["COMUNE", "MUNICIPALITY", "IDENTITA", "IDENTITY", "MINISTERO", "INTERNO", "REPUBBLICA", "ITALIANA", "TITOLARE", "SIGNATURE"].forEach(function (w) { if (PAROLE_ET.indexOf(w) < 0) PAROLE_ET.push(w); });
+var PAROLE_CAMPO = []; Object.keys(VOC).forEach(function (k) { if (k === "testata" || k === "ignora" || k === "ignoradata") return; VOC[k].forEach(function (f) { f.split(" ").forEach(function (w) { if (w.length >= 3 && !/^(DELLA|DELLE|DEGLI|DEL|DES|DER|DEN|VAN|VON|THE|AND|NAT[OA])$/.test(w) && PAROLE_CAMPO.indexOf(w) < 0) PAROLE_CAMPO.push(w); }); }); });
+["MUNICIPALITY", "IDENTITY", "SIGNATURE", "PASSEPORT", "PASAPORTE", "SOPORTE"].forEach(function (w) { PAROLE_CAMPO.push(w); });
+/* pezzo di un'etichetta spezzata dal copia-incolla («SUR», «MUNICIPAL», «KORTNUMMER», «NAISSARC»): non è un dato */
+function frammentoEtichetta(w) {
+  w = sa(w).toUpperCase().replace(/[^A-Z]/g, ""); if (w.length < 3) return false;
+  return PAROLE_CAMPO.some(function (e) { return e === w || (e.length > w.length && (e.indexOf(w) === 0 || e.slice(-w.length) === w) && w.length >= Math.min(4, e.length - 1)) ; });
+}
 function parolaEtichetta(w) { w = sa(w).toUpperCase().replace(/[^A-Z0-9]/g, ""); if (w.length < 5) return false; return PAROLE_ET.some(function (e) { return tokUguale(e, w); }); }
 function luogoAncora(v) { var x = pulisciValore(v).replace(/[0-9]{1,2}[./\-][0-9]{1,2}[./\-][0-9]{2,4}.*$/, "").trim(); if (!x || !/[A-Za-z]{2}/.test(x) || /\d{2}/.test(x.replace(/[(\[{][^)\]}]*[)\]}]/g, ""))) return "";
   if (x.split(/\s+/).some(parolaEtichetta) || /\b(COMUNE|CONUNE|COMUN|MUNICIP)/i.test(sa(x))) return ""; /* «COMUNE O1», «MOROCPALITY»: etichetta storpiata, non un luogo */ if (ancoreRiga(tokRiga(x)).length) return ""; return x; }
@@ -778,7 +796,10 @@ function ancore(testo) {
   // resto di una riga tolte le etichette (e i numerini «(1)» dei passaporti)
   function resto(x) {
     var s = x.r, sa_ = sa(s), pezzi = [], u = 0;
-    x.an.forEach(function (a) { pezzi.push(s.slice(u, a.i)); u = a.f; }); pezzi.push(s.slice(u));
+    x.an.forEach(function (a) { pezzi.push(s.slice(u, a.i)); u = a.f; });
+    var coda = s.slice(u), mc = /^\s*\/\s*([A-Za-z]{2,})\.?\s*$/.exec(coda); // «COGNOME / SUR»: la seconda lingua mozzata dal copia-incolla
+    if (mc && PAROLE_CAMPO.some(function (e) { return e.indexOf(sa(mc[1]).toUpperCase()) === 0; })) coda = "";
+    pezzi.push(coda);
     return pezzi.join(" ").replace(/\(\s*\d{1,2}\s*\)/g, " ").replace(/[\/|:;]+/g, " ").replace(/\s+/g, " ").trim();
   }
   R.forEach(function (x) { x.resto = x.an.length ? resto(x) : x.r; x.solo = x.an.length > 0 && (x.resto.replace(/[^A-Za-z0-9]/g, "").length < 2 || riga_spazzatura(x.resto)); });
@@ -811,9 +832,9 @@ function ancore(testo) {
     if (!chiavi.length) return;
     if (!x.solo && chiavi.length === 1) { var v0 = prova(chiavi[0], x.resto); if (v0 && metti(chiavi[0], v0, null, "ancora")) return; }
     // riga con più etichette («SESSO STATURA CITTADINANZA», «Sex/Sexe (5) Place of birth (6)»): il valore sotto si divide per tipo
-    var cerca = function (dir, max) {
+    var cerca = function (dir, max, salta) {
       for (var j = i + dir, n = 0, giri = 0; j >= 0 && j < R.length && n < max && giri < 14; j += dir, giri++) {
-        var y = R[j]; if (y.spaz || usate[j]) continue;
+        var y = R[j]; if (y.spaz || usate[j] || (salta && salta.indexOf(j) >= 0)) continue;
         if (!y.solo) n++;
         if (y.solo) { if (dir > 0 && y.an.some(function (a) { return a.k === chiavi[0]; })) continue; if (dir > 0) continue; else break; } // l'altra lingua della stessa etichetta, o un'altra etichetta
         return j;
@@ -854,8 +875,9 @@ function ancore(testo) {
       });
       if (fatto) usate[j] = true; return fatto;
     };
-    var j = cerca(dir, 3); if (j >= 0 && assegna(j)) { vicini += Math.abs(j - i) <= 2 ? 3 : 2; return; }
-    j = cerca(dir, 5); if (j >= 0 && assegna(j)) { vicini += 2; return; }
+    var provati = [], j; // il primo valore con la forma giusta tra i prossimi (il copia-incolla può metterci in mezzo un numero o un'altra colonna)
+    for (var tent = 0; tent < 3; tent++) { j = cerca(dir, 3, provati); if (j < 0) break; if (assegna(j)) { vicini += Math.abs(j - i) <= 2 ? 3 : 2; return; } provati.push(j); }
+    j = cerca(dir, 5, provati); if (j >= 0 && assegna(j)) { vicini += 2; return; }
     j = cerca(-dir, 2); if (j >= 0 && assegna(j)) vicini += 1; // trovato solo nell'altra direzione: conta meno
   });
   return vicini; }
@@ -883,7 +905,9 @@ function ancore(testo) {
       }
     }
   }
-  if (!out.numero && pd === "ITA") { var mm = NUM_CIE.exec(sa(tutto).toUpperCase()); if (mm && fixCie(mm[1])) { out.numero = fixCie(mm[1]); out.da.numero = "forma"; } }
+  if (pd === "ITA" && !/PATENTE/i.test(sa(tutto))) { var mm, reC = new RegExp(NUM_CIE.source, "g"), su = sa(tutto).toUpperCase().replace(/(C[A-Z0-9])\s+(?=[0-9OIlSBZ]{3})/g, "$1"); // a volte il copia-incolla spezza il numero
+    while ((mm = reC.exec(su))) { var fc = fixCie(mm[1]); if (fc) { out.cie = fc; break; } }
+    if (out.cie && !out.numero) { out.numero = out.cie; out.da.numero = "forma"; } }
   if (out.numero && pd === "ITA" && /^C[A-Z0-9]/.test(out.numero) && out.numero.length === 9 && fixCie(out.numero)) out.numero = fixCie(out.numero);
   if (!out.sesso || !out.citt) { var msc = /(?:^|\n)\s*([MF])\s+(\d{3})\s+([A-Z]{3})\s*(?:\n|$)/.exec(tutto); if (msc) { if (!out.sesso) { out.sesso = msc[1]; out.da.sesso = "forma"; } if (!out.citt && codicePaese(msc[3])) { out.citt = codicePaese(msc[3]); out.da.citt = "forma"; } } }
   if (!out.citt) { var cw = /\b(BRITISH CITIZEN|IRISH|EIREANNACH|FRANCAISE|ESPANOLA|DEUTSCH|ITALIANA)\b/.exec(sa(tutto).toUpperCase()); if (cw) { out.citt = codicePaese(cw[1]); out.da.citt = "forma"; } }
@@ -895,23 +919,36 @@ function ancore(testo) {
 }
 
 function N_(x) { return String(x || "").toUpperCase().replace(/[^A-Z0-9]/g, ""); }
+/* un valore che in realtà è un'etichetta o un suo pezzo («SUR», «FODELSEDATUM», «KORTNUMMER», «S SURN») */
+function eEtichetta(v) {
+  var w = sa(String(v || "")).toUpperCase().replace(/[^A-Z ]/g, " ").trim().split(/\s+/).filter(Boolean); if (!w.length) return false;
+  if (ancoreRiga(tokRiga(w.join(" "))).length) return true;
+  return w.every(function (x) { return frammentoEtichetta(x) || (x.length >= 3 && PAROLE_CAMPO.some(function (e) { return e.length > x.length && e.indexOf(x) === 0; })); });
+}
 function uniscianc(q, an) {
   q.euristico = q.euristico || [];
+  if (!q.mrz) ["cognome", "nome", "cittadinanza", "comune_nascita", "luogo_nascita", "rilascio_comune"].forEach(function (k) { if (q[k] && eEtichetta(q[k])) { q[k] = ""; if (k === "comune_nascita") q.provincia_nascita = ""; } });
   var mappa = [["cognome", "cognome"], ["nome", "nome"], ["data_nascita", "data_nascita"], ["sesso", "sesso"], ["citt", "cittadinanza"], ["numero", "numero_documento"]];
   mappa.forEach(function (m) {
     var v = an[m[0]], k = m[1], come = an.da[m[0]]; if (!v) return;
     if (q.tipo_documento === "PATEN" && (k === "sesso" || k === "cittadinanza")) return; // la patente non li riporta
     if (q.mrz && q[k]) return; // la MRZ con le cifre di controllo vince
+    if (k === "data_nascita" && q[k] && q[k] !== v) { // due date diverse per la nascita: quella di nascita è sempre la più vecchia (le altre sono emissione e scadenza)
+      var ord = function (d) { var m = /^(\d\d)\/(\d\d)\/(\d{4})$/.exec(d); return m ? m[3] + m[2] + m[1] : "9"; };
+      if (ord(v) < ord(q[k])) { q[k] = v; if (q.euristico.indexOf(k) < 0) q.euristico.push(k); } return; }
     var eur = q.euristico.indexOf(k) >= 0;
     if (!q[k]) { q[k] = v; if (come !== "ancora") q.euristico.push(k); }
     else if (k === "numero_documento" && come === "ancora" && q[k] !== v && N_(q[k]).indexOf(N_(v)) >= 0 && N_(v).length >= 6) q[k] = v; // «GBR540001974» → «540001974»
     else if ((k === "cognome" || k === "nome") && come === "ancora" && v.indexOf(q[k] + " ") === 0) q[k] = v; // cognome su due righe («SANCHEZ» / «PEREZ»)
     else if (eur && come === "ancora" && q[k] !== v) { q[k] = v; q.euristico = q.euristico.filter(function (x) { return x !== k; }); }
   });
-  if (an.luogo_p && !q.comune_nascita && !q.luogo_nascita && !q.stato_nascita) { Object.keys(an.luogo_p).forEach(function (k) { q[k] = an.luogo_p[k]; }); if (an.da.luogo !== "ancora") q.euristico.push("comune_nascita"); }
+  var debole = function (v) { v = String(v || "").trim(); return !v || /[a-z]{4}/.test(v) && !/[A-Z]{3}/.test(v) || /NAISS|BIRTH|NASCIT|PLACE|LIEU|LUGAR|GEBURT/i.test(v) || v.split(/\s+/).some(parolaEtichetta); };
+  if (an.luogo_p && debole(q.comune_nascita) && debole(q.luogo_nascita) && !q.stato_nascita) { q.comune_nascita = ""; q.luogo_nascita = ""; q.provincia_nascita = ""; Object.keys(an.luogo_p).forEach(function (k) { q[k] = an.luogo_p[k]; }); if (an.da.luogo !== "ancora") q.euristico.push("comune_nascita"); }
   if (an.rilascio_comune && !q.rilascio_comune && !q.rilascio_stato) q.rilascio_comune = an.rilascio_comune;
   if (an.rilascio_stato_doc && !q.rilascio_stato && !q.rilascio_comune && MRZ && MRZ.PAESI && MRZ.PAESI[an.rilascio_stato_doc]) q.rilascio_stato = MRZ.PAESI[an.rilascio_stato_doc];
-  if (!q.tipo_documento && an.paese_doc === "ITA" && /^C[A-Z]\d{5}[A-Z]{2}$/.test(q.numero_documento || "")) q.tipo_documento = "IDELE";
+  // carta d'identità elettronica italiana: il numero è SEMPRE «C» + lettera + 5 cifre + 2 lettere (CA12345AB, le più nuove CB…): se c'è nel testo vince su ogni altro numero
+  if (an.paese_doc === "ITA" && !q.mrz && an.cie && q.numero_documento !== an.cie && !(q.tipo_documento === "PATEN")) { if (q.numero_documento && !/^C[A-Z]\d{5}[A-Z]{2}$/.test(q.numero_documento)) q.euristico.push("numero_documento"); q.numero_documento = an.cie; }
+  if (an.paese_doc === "ITA" && /^C[A-Z]\d{5}[A-Z]{2}$/.test(q.numero_documento || "") && (!q.tipo_documento || q.tipo_documento === "IDENT")) q.tipo_documento = "IDELE";
 }
 
 var api = { _na: function (v) { return [nomeAncora(v), sembraEtichetta(v), pulisciValore(v)]; }, _ar: function (r) { return ancoreRiga(tokRiga(r)); }, _spaz: function (r) { return riga_spazzatura(r); }, ancore: ancore, paeseDoc: paeseDoc, codicePaese: codicePaese, CAPOLUOGO: CAPOLUOGO, unisci: unisci, leggi1: leggi1, riempiti: riempiti, largo: largo, ripara: ripara, euristica: euristica, dividi: dividi, correggiNumero: correggiNumero, blocchi: blocchi, raggruppa: raggruppa, mrzTutte: mrzTutte, cfValido: cfValido, cfControlla: cfControlla, leggi: leggi, persone: persone, confronta: confronta, dataNorm: dataNorm, tipoDocDa: tipoDocDa, sessoDa: sessoDa };

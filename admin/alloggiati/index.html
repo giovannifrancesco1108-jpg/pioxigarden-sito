@@ -85,7 +85,7 @@ details[open].card>summary::after{content:"▴"}
 </head>
 <body>
 <main>
-<header><h1>Alloggiati Web<small>Comunicazione degli ospiti alla Questura</small></h1><p style="margin:4px 0 0;font-weight:700;color:#0a7a3d">VERSIONE 12 · LETTURA FOTO A FASCE + ANCORE</p><a class="btn g s" href="/admin/">← Pannello</a></header>
+<header><h1>Alloggiati Web<small>Comunicazione degli ospiti alla Questura</small></h1><p style="margin:4px 0 0;font-weight:700;color:#0a7a3d">VERSIONE 13 · INCOLLA E LEGGI + COMUNI PRECISI</p><a class="btn g s" href="/admin/">← Pannello</a></header>
 
 <section class="card" id="auth" hidden>
  <h2>Accedi</h2>
@@ -131,6 +131,10 @@ details[open].card>summary::after{content:"▴"}
 
 <section class="card" id="nuova">
  <h2>Nuova comunicazione</h2>
+ <div class="veloce">
+  <button class="btn" type="button" id="incVai" style="font-size:1.08rem;padding:14px 16px;width:100%">📋 Incolla e leggi</button>
+  <p class="hint"><b>Il modo più preciso e veloce:</b> apri la foto del documento nell'app <b>Foto</b> del telefono, tieni premuto sul testo → <b>Seleziona tutto</b> → <b>Copia</b>, poi torna qui e tocca <b>Incolla e leggi</b>. Il telefono legge il testo meglio di qualsiasi scanner; il disordine delle righe lo sistemo io. In alternativa, nel riquadro qui sotto la tastiera dell'iPhone ha il tasto <b>Scansiona testo</b>: inquadri il documento e il testo entra da solo.</p>
+ </div>
  <details id="inc"><summary><b>📋 Incolla il testo del documento</b></summary>
   <div style="display:grid;gap:8px;margin-top:8px">
    <textarea id="incT" placeholder="Incolla qui il testo copiato, anche le righe con &lt;&lt;&lt;: cognome, nome, data di nascita, numero… Funziona anche senza internet." spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
@@ -210,11 +214,31 @@ function caricaTabelle(){return api("GET","tabelle").then(function(j){TAB={stati
  [TAB.stati,TAB.comuni].forEach(function(L){L.sort(function(a,b){return a.x-b.x||a.n.localeCompare(b.n)})});
  ST.tab=j.info;var s=$("app");s.innerHTML="";TAB.app.forEach(function(a){var o=document.createElement("option");o.value=a.c;o.textContent=a.n;s.appendChild(o)});$("appL").hidden=!TAB.app.length;
  render()})}
-var SIN={"ITALIANA":"ITALIA","ITALIANO":"ITALIA","ITALIAN":"ITALIA","FRANCESE":"FRANCIA","FRENCH":"FRANCIA","TEDESCA":"GERMANIA","TEDESCO":"GERMANIA","GERMAN":"GERMANIA","SPAGNOLA":"SPAGNA","SPAGNOLO":"SPAGNA","SPANISH":"SPAGNA","BRITANNICA":"REGNO UNITO","BRITISH":"REGNO UNITO","AMERICANA":"STATI UNITI D'AMERICA","AMERICAN":"STATI UNITI D'AMERICA","STATI UNITI":"STATI UNITI D'AMERICA","USA":"STATI UNITI D'AMERICA","GRAN BRETAGNA":"REGNO UNITO","INGHILTERRA":"REGNO UNITO","OLANDA":"PAESI BASSI","RUSSIA":"FEDERAZIONE RUSSA","REPUBBLICA CECA":"CECA, REPUBBLICA","CINA":"CINESE, REPUBBLICA POPOLARE","COREA DEL SUD":"COREA, REPUBBLICA (COREA DEL SUD)"};
-function trova(L,nome,prov){var k=norm(nome);if(!k)return null;var s=SIN[k];
- var es=L.filter(function(o){return o.k===k||(s&&o.k===norm(s))});if(prov){var ep=es.filter(function(o){return o.p===prov});if(ep.length)es=ep}
- if(es.length)return es.find(function(o){return!o.x})||es[0];
- var pa=L.filter(function(o){return!o.x&&(o.k.indexOf(k)===0||k.indexOf(o.k)===0)});return pa.length===1?pa[0]:null}
+var SIN={"REGGIO EMILIA":"REGGIO NELL'EMILIA","REGGIO CALABRIA":"REGGIO DI CALABRIA","BOLZANO":"BOLZANO BOZEN","BOZEN":"BOLZANO BOZEN","AOSTA":"AOSTA","FORLI":"FORLI'","CANTU":"CANTU'","ITALIANA":"ITALIA","ITALIANO":"ITALIA","ITALIAN":"ITALIA","FRANCESE":"FRANCIA","FRENCH":"FRANCIA","TEDESCA":"GERMANIA","TEDESCO":"GERMANIA","GERMAN":"GERMANIA","SPAGNOLA":"SPAGNA","SPAGNOLO":"SPAGNA","SPANISH":"SPAGNA","BRITANNICA":"REGNO UNITO","BRITISH":"REGNO UNITO","AMERICANA":"STATI UNITI D'AMERICA","AMERICAN":"STATI UNITI D'AMERICA","STATI UNITI":"STATI UNITI D'AMERICA","USA":"STATI UNITI D'AMERICA","GRAN BRETAGNA":"REGNO UNITO","INGHILTERRA":"REGNO UNITO","OLANDA":"PAESI BASSI","RUSSIA":"FEDERAZIONE RUSSA","REPUBBLICA CECA":"CECA, REPUBBLICA","CINA":"CINESE, REPUBBLICA POPOLARE","COREA DEL SUD":"COREA, REPUBBLICA (COREA DEL SUD)"};
+/* Trova un comune o uno stato dal testo letto, anche se l'OCR o il copia-incolla l'hanno sporcato:
+   1) uguale (con i sinonimi); 2) uguale togliendo spazi, apostrofi e confusioni lettere/cifre (GENZAN0 → GENZANO, SANT AGATA → SANT'AGATA);
+   3) dentro un testo più lungo («GENZANO DI ROMA RM 11.08.2003 SESSO»): il pezzo di parole che è un comune;
+   4) simile (1 lettera sbagliata ogni 5), preferendo la provincia letta. Nei casi 3-4 il risultato ha «vicino:true» e va controllato. */
+function compatto(s){return norm(s).replace(/\bS\.?\s+(?=[A-Z]{3})/g,"SAN ").replace(/0/g,"O").replace(/1/g,"I").replace(/5/g,"S").replace(/8/g,"B").replace(/2/g,"Z").replace(/6/g,"G").replace(/[^A-Z]/g,"")}
+function lev(a,b,max){if(Math.abs(a.length-b.length)>max)return max+1;var p=[],c,i,j;for(j=0;j<=b.length;j++)p[j]=j;
+ for(i=1;i<=a.length;i++){c=[i];var mn=i;for(j=1;j<=b.length;j++){c[j]=Math.min(p[j]+1,c[j-1]+1,p[j-1]+(a[i-1]===b[j-1]?0:1));if(c[j]<mn)mn=c[j]}if(mn>max)return max+1;p=c}return p[b.length]}
+function trova(L,nome,prov){var k=norm(nome);if(!k)return null;var s=SIN[k];prov=String(prov||"").toUpperCase().replace(/[^A-Z0-9]/g,"").replace(/1/g,"I").replace(/0/g,"O").replace(/5/g,"S").replace(/2/g,"Z").replace(/8/g,"B");
+ var scegli=function(es){if(prov){var ep=es.filter(function(o){return o.p===prov});if(ep.length)es=ep}return es.find(function(o){return!o.x})||es[0]};
+ var es=L.filter(function(o){return o.k===k||(s&&o.k===norm(s))});if(es.length)return scegli(es);
+ if(!L._kc)L.forEach(function(o){o.kc=compatto(o.n)}),L._kc=true;
+ var kc=compatto(nome);if(kc.length<2)return null;
+ es=L.filter(function(o){return o.kc===kc});if(es.length)return scegli(es);
+ var vicino=function(o){return o?Object.assign({},o,{vicino:true}):null};
+ var simile=function(q,prefP){var max=Math.max(1,Math.floor(q.length/5)),best=null;
+  L.forEach(function(o){var d=lev(q,o.kc,max);if(d>max)return;var sc=d-(prov&&o.p===prov?0.6:0)+(o.x?0.3:0);if(!best||sc<best.sc)best={o:o,sc:sc}});return best&&best.o};
+ // 1) tutto il testo, simile
+ var b0=simile(kc);if(b0)return vicino(b0);
+ // 2) un pezzo di parole (il più lungo) che è un comune: «GENZANO DI ROMA RM 11 08 2003 SESSO»
+ var w=k.split(" ").filter(function(x){return/[A-Z]/.test(x)&&!/^\d+$/.test(x)});
+ for(var n=Math.min(w.length-1,6);n>=1;n--){
+  for(var i=0;i+n<=w.length;i++){var pz=compatto(w.slice(i,i+n).join(" "));if(pz.length<4)continue;es=L.filter(function(o){return o.kc===pz});if(es.length)return vicino(scegli(es))}
+  if(n>=2)for(i=0;i+n<=w.length;i++){pz=compatto(w.slice(i,i+n).join(" "));if(pz.length<7)continue;var bs=simile(pz);if(bs)return vicino(bs)}}
+ var pa=L.filter(function(o){return!o.x&&(o.kc.indexOf(kc)===0||kc.indexOf(o.kc)===0)&&Math.min(o.kc.length,kc.length)>=5});return pa.length===1?vicino(pa[0]):null}
 function cerca(L,q){var k=norm(q);if(!k)return[];var a=[],b=[];for(var i=0;i<L.length&&a.length<12;i++){var o=L[i];if(o.k.indexOf(k)===0)a.push(o);else if(b.length<12&&o.k.indexOf(k)>0)b.push(o)}return a.concat(b).slice(0,8)}
 function etich(o){return o?o.n+(o.p&&o.p!=="EE"?" ("+o.p+")":"")+(o.x?" · cessato":""):""}
 function perCodice(c){if(!c)return null;var L=/^100000/.test(c)?TAB.stati:TAB.comuni;for(var i=0;i<L.length;i++)if(L[i].c===c)return L[i];return null}
@@ -223,12 +247,12 @@ function perCodice(c){if(!c)return null;var L=/^100000/.test(c)?TAB.stati:TAB.co
 var G=[],seq=0,tipo="g",ESITI=null;
 function nuovo(p){p=p||{};return{id:++seq,cognome:p.cognome||"",nome:p.nome||"",sesso:p.sesso||"",nascita:p.data_nascita||"",statoN:"",comuneN:"",citt:"",doc:"",num:p.numero_documento||"",ril:"",foto:p.foto||[],dubbi:{}}}
 function daAI(p,foto){var g=nuovo(p);g.foto=foto;(p.dubbi||[]).forEach(function(d){g.dubbi[d]=1});
- var sn=trova(TAB.stati,p.stato_nascita||(p.comune_nascita?"ITALIA":""));if(sn)g.statoN=sn.c;else if(p.stato_nascita)g.dubbi.stato_nascita=1;
- if(g.statoN===ITALIA){var cn=trova(TAB.comuni,p.comune_nascita,(p.provincia_nascita||"").toUpperCase());if(cn)g.comuneN=cn.c;else g.dubbi.comune_nascita=1}
- var ci=trova(TAB.stati,p.cittadinanza);if(ci)g.citt=ci.c;else if(p.cittadinanza)g.dubbi.cittadinanza=1;
+ var sn=trova(TAB.stati,p.stato_nascita||(p.comune_nascita?"ITALIA":""));if(sn){g.statoN=sn.c;if(sn.vicino)g.dubbi.stato_nascita=1}else if(p.stato_nascita)g.dubbi.stato_nascita=1;
+ if(g.statoN===ITALIA){var cn=trova(TAB.comuni,p.comune_nascita||p.luogo_nascita,(p.provincia_nascita||"").toUpperCase());if(cn){g.comuneN=cn.c;if(cn.vicino||(p.provincia_nascita&&cn.p&&cn.p!==String(p.provincia_nascita).toUpperCase()))g.dubbi.comune_nascita=1}else g.dubbi.comune_nascita=1}
+ var ci=trova(TAB.stati,p.cittadinanza&&/^[A-Z]{3}$/.test(p.cittadinanza)&&MRZ.PAESI[p.cittadinanza]?MRZ.PAESI[p.cittadinanza]:p.cittadinanza);if(ci){g.citt=ci.c;if(ci.vicino)g.dubbi.cittadinanza=1}else if(p.cittadinanza)g.dubbi.cittadinanza=1;
  var d=TAB.doc.find(function(x){return x.c===p.tipo_documento});if(d)g.doc=d.c;else if(p.tipo_documento)g.dubbi.tipo_documento=1;
  var rs=norm(p.rilascio_stato),rl=null;if(p.rilascio_comune&&(!rs||rs==="ITALIA"))rl=trova(TAB.comuni,p.rilascio_comune);if(!rl&&rs&&rs!=="ITALIA")rl=trova(TAB.stati,p.rilascio_stato);
- if(rl)g.ril=rl.c;else if(p.rilascio_comune||p.rilascio_stato)g.dubbi.rilascio=1;
+ if(rl){g.ril=rl.c;if(rl.vicino)g.dubbi.rilascio=1}else if(p.rilascio_comune||p.rilascio_stato)g.dubbi.rilascio=1;
  return g}
 function capoTipo(){return G.length<2?"16":tipo==="f"?"17":"18"}
 function membroTipo(){return tipo==="f"?"19":"20"}
@@ -443,7 +467,7 @@ var VEI={D:"GERMANIA",F:"FRANCIA",E:"SPAGNA",I:"ITALIA",A:"AUSTRIA",B:"BELGIO",N
 function adatta(p){var q={};for(var k in p)q[k]=p[k];q.dubbi=(p.dubbi||[]).slice();
  if(VEI[q.cittadinanza]&&!/^[A-Z]{3}$/.test(q.cittadinanza)||(q.cittadinanza==="USA"||q.cittadinanza==="IRL"||q.cittadinanza==="SLO"||q.cittadinanza==="FIN"))q.cittadinanza=VEI[q.cittadinanza]||q.cittadinanza;
  if(/^[A-Z]{3}$/.test(q.cittadinanza||"")&&MRZ.PAESI[q.cittadinanza])q.cittadinanza=MRZ.PAESI[q.cittadinanza];
- if(!q.stato_nascita&&!q.comune_nascita&&q.luogo_nascita){var c=trova(TAB.comuni,q.luogo_nascita);
+ if(!q.stato_nascita&&!q.comune_nascita&&q.luogo_nascita){var c=trova(TAB.comuni,q.luogo_nascita);if(c&&c.vicino&&!/^(ITA|ITALIA)$/.test(q.cittadinanza||""))c=null; /* una città estera non diventa un comune italiano «simile» */
   if(c){q.comune_nascita=q.luogo_nascita;q.provincia_nascita=q.provincia_nascita||c.p;q.stato_nascita="ITALIA"}
   else{var st=trova(TAB.stati,q.luogo_nascita);if(st)q.stato_nascita=st.n;else{q.dubbi.push("stato_nascita");if(q.cittadinanza)q.stato_nascita=q.cittadinanza}}}
  if(!q.stato_nascita&&!q.comune_nascita&&q.cittadinanza){q.stato_nascita=q.cittadinanza;q.dubbi.push("stato_nascita")}
@@ -473,6 +497,11 @@ function leggiIncolla(usaAI,larga){var t=$("incT").value;if(!t.trim())return say
    l.avvisi=(l.avvisi||[]).concat(dif.length?["Lettura locale e AI non coincidono su: "+dif.join(", ")+"."]:[])});
   fine(P)}).catch(function(e){say($("mI"),e.code==="ai_mancante"?"L'AI non è collegata: uso solo la lettura sul telefono.":"L'AI non ha risposto: uso solo la lettura sul telefono.");fine(loc.persone)})}
 $("incGo").onclick=function(){leggiIncolla(false,false)};
+$("incT").addEventListener("paste",function(){setTimeout(function(){if($("incT").value.trim())leggiIncolla(false,true)},60)}); /* appena incolli, legge da solo */
+/* «Incolla e leggi»: prende il testo dagli appunti e lo legge subito, con la lettura larga (copia-incolla dal telefono = righe in disordine) */
+$("incVai").onclick=function(){var vai=function(t){if(!t||!t.trim()){$("inc").open=true;$("incT").focus();return say($("mI"),"Negli appunti non c'è testo: copia il testo del documento (dall'app Foto: tieni premuto sul testo → Seleziona tutto → Copia) oppure incollalo qui sotto.")}
+  $("incT").value=t;$("inc").open=true;leggiIncolla(false,true);$("inc").scrollIntoView({behavior:"smooth",block:"start"})};
+ if(navigator.clipboard&&navigator.clipboard.readText)navigator.clipboard.readText().then(vai,function(){vai("")});else vai("")};
 $("incRi").onclick=function(){leggiIncolla(false,true)};
 $("fotoRi").onclick=riprovaFoto;
 $("fotoAi").onclick=function(){if(!FILES.length)return;if(!confirm("Leggo le foto con l'AI. Consuma token AI. Procedo?"))return;say($("mL"),"Leggo con l'AI…",true);leggiConAI(FILES)};

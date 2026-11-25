@@ -1,7 +1,7 @@
-/* Banco di prova «mondo»: 850 documenti SINTETICI (dati inventati) di molti paesi, come escono dall'OCR di una foto.
+/* Banco di prova «mondo»: 1150 documenti SINTETICI (dati inventati) di molti paesi, come escono dall'OCR di una foto.
    Per ogni documento si conoscono i valori veri; si misura quanti campi il lettore ricava giusti:
    cognome, nome, sesso, data di nascita, luogo di nascita, cittadinanza, numero, tipo e luogo di rilascio.
-   Tre livelli: «pulito» (testo copiato bene), «foto» (OCR normale), «pessima» (OCR di una foto brutta).
+   Quattro livelli: «pulito» (testo copiato bene), «foto» (OCR normale), «pessima» (OCR di una foto brutta), «copia» (testo copiato dal telefono con le righe in disordine).
    Il rumore imita quello visto davvero: etichette storpiate (SUBNAME, NASOTR), righe dello schermo («02:12», «Rispondi»),
    simboli ai lati dei valori, province lette «(S1)», righe in ordine sparso, riempitivi MRZ letti «ccc».
    Uso: node tests/corpus/mondo.js [--errori] [--livello=foto] [--paese=FRA] [--modello=CIE] */
@@ -167,8 +167,34 @@ function storpia(w) { // una lettera sbagliata, mancante o minuscola
 const SCHERMO = ["02:12 N", "18:40 5G", "4G «_)", "et", "leri", "eco", "16:00", "Rispondi", "a!", "ee Rs", "+39 331 726 6401", "2 foto", "Scansionato con CamScanner", "ago 19, Doc 1", "~LZ", "<", "«", "ae"];
 const SPORCO = ["%", "_", "«", "|", "~", "' a", "E ve", "ee", "= \\"];
 function etichetta(r) { return /^[A-Z'][A-Z' .()\/,]+$/.test(r) && !/\d/.test(r) && r.length > 3 && /(SURNAME|NAME|NOME|BIRTH|NASCITA|SESSO|SEX|NATIONAL|CITTADIN|EXPIR|ISSU|EMISSIONE|SCADENZA|STATURA|HEIGHT|MUNICIPALITY|FIRMA|SIGNATURE|NOM|PRENOM|APELLIDOS|NOMBRE|SEXO|NACIMIENTO|NAISS|DOCUMENT|AUTHORITY|NUMER|PRIEZVISKO|MENO|NAAM|VOORNAMEN|NAZWISKO|IMIONA|PRENUME|NUME|GEBURT|VORNAME)/i.test(r); }
+/* «copia»: testo copiato dal telefono (Testo dal vivo / Google Lens) da una foto: l'OCR è buono, ma l'ordine delle righe è sminchiato.
+   Etichette bilingui spezzate su due righe e la seconda metà finisce più giù, valori di due colonne invertiti,
+   l'inizio della prima riga tagliato, pezzi di etichetta mozzati («leport/No.», «Surname/Nom/A»), righe di due colonne fuse. */
+function copia(testo) {
+  let r = testo.split("\n").filter((x) => x.trim());
+  if (caso(0.5)) r[0] = r[0].slice(1); // «IGNATURE OF BEARER»
+  const out = [];
+  for (let i = 0; i < r.length; i++) {
+    let x = r[i];
+    if (etichetta(x) && /\//.test(x) && caso(0.35)) { // «Passport No./No. du Passeport» → «Passport No/No. du» … più giù «Passeport»
+      const pz = x.split("/"); const a = pz.slice(0, Math.max(1, pz.length - 1)).join("/"), b = pz[pz.length - 1];
+      out.push(a); r.splice(Math.min(r.length, i + 2 + int(0, 1)), 0, caso(0.5) ? b.trim() : b.trim().slice(int(1, 3)));
+      continue;
+    }
+    if (etichetta(x) && caso(0.15)) x = x.slice(0, Math.max(6, x.length - int(3, 8))); // etichetta mozzata
+    out.push(x);
+  }
+  for (let i = 1; i + 1 < out.length; i++) { // valori di due colonne invertiti: «etichetta A / etichetta B / valore B / valore A»
+    if (!etichetta(out[i]) && !etichetta(out[i + 1]) && caso(0.12)) { const t = out[i]; out[i] = out[i + 1]; out[i + 1] = t; i++; }
+  }
+  for (let i = 0; i + 1 < out.length; i++) { // due righe corte fuse (colonne affiancate)
+    if (!etichetta(out[i]) && !etichetta(out[i + 1]) && out[i].length < 14 && out[i + 1].length < 14 && caso(0.1)) { out.splice(i, 2, out[i] + " " + out[i + 1]); }
+  }
+  return out.join("\n");
+}
 function rumore(testo, liv) {
   if (liv === "pulito") return testo;
+  if (liv === "copia") return copia(testo);
   const forte = liv === "pessima", righe = testo.split("\n"), out = [];
   const pIn = forte ? 0.35 : 0.15;
   for (let k = 0; k < int(2, forte ? 7 : 4); k++) out.push(pick(SCHERMO)); // la barra di stato e l'intestazione dello screenshot
@@ -204,7 +230,7 @@ function persona(paese) {
   return { paese, c: pick(P0.cog), n: pick(s === "M" ? P0.m : P0.f), s, d: nascita(1935, 2007), scad: futura(), citta: P0.citta ? pick(P0.citta) : "" };
 }
 function genera() {
-  const D = [], livelli = [["pulito", 300], ["foto", 350], ["pessima", 200]];
+  const D = [], livelli = [["pulito", 300], ["foto", 350], ["pessima", 200], ["copia", 300]];
   const piano = [ // [modello, paese o lista, peso]
     ["CIE", ["ITA"], 26], ["PATENTE", ["ITA"], 8], ["CARTACEA", ["ITA"], 5], ["PASS_UK", ["GBR", "IRL"], 10], ["CNI_FR", ["FRA"], 6], ["DNI_ES", ["ESP"], 6],
     ["ID_EU", ["DEU", "NLD", "BEL", "PRT", "POL", "ROU", "SVK", "CZE", "SWE", "HRV", "AUT"], 18],
@@ -249,7 +275,7 @@ if (require.main === module) {
   const mostra = process.argv.includes("--errori"), solo = { liv: arg("livello"), paese: arg("paese"), modello: arg("modello") };
   const D = genera().filter((d) => (!solo.liv || d.liv === solo.liv) && (!solo.paese || d.paese === solo.paese) && (!solo.modello || d.modello === solo.modello));
   const campi = ["cognome", "nome", "sesso", "data", "luogo", "citt", "numero", "tipo", "rilascio"];
-  const tot = {}, perLiv = {}, perMod = {}, perPaese = {}; let n = 0, perfetti = { pulito: [0, 0], foto: [0, 0], pessima: [0, 0] }, persone1 = 0;
+  const tot = {}, perLiv = {}, perMod = {}, perPaese = {}; let n = 0, perfetti = { pulito: [0, 0], foto: [0, 0], pessima: [0, 0], copia: [0, 0] }, persone1 = 0;
   D.forEach((d) => {
     const ps = INC.leggi(d.testo).persone; if (ps.length === 1) persone1++;
     const p = ps.sort((a, b) => Object.keys(b).length - Object.keys(a).length)[0] || {};
