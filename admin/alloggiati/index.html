@@ -85,7 +85,7 @@ details[open].card>summary::after{content:"▴"}
 </head>
 <body>
 <main>
-<header><h1>Alloggiati Web<small>Comunicazione degli ospiti alla Questura</small></h1><p style="margin:4px 0 0;font-weight:700;color:#0a7a3d">VERSIONE 8 · SCANNER + LETTURA ANCHE DI DOCUMENTI ESTERI</p><a class="btn g s" href="/admin/">← Pannello</a></header>
+<header><h1>Alloggiati Web<small>Comunicazione degli ospiti alla Questura</small></h1><p style="margin:4px 0 0;font-weight:700;color:#0a7a3d">VERSIONE 11 · LETTURE UNITE E TESTO PULITO</p><a class="btn g s" href="/admin/">← Pannello</a></header>
 
 <section class="card" id="auth" hidden>
  <h2>Accedi</h2>
@@ -134,13 +134,15 @@ details[open].card>summary::after{content:"▴"}
  <details id="inc"><summary><b>📋 Incolla il testo del documento</b></summary>
   <div style="display:grid;gap:8px;margin-top:8px">
    <textarea id="incT" placeholder="Incolla qui il testo copiato, anche le righe con &lt;&lt;&lt;: cognome, nome, data di nascita, numero… Funziona anche senza internet." spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
-   <div class="row"><button class="btn" type="button" id="incGo">Leggi il testo</button><button class="btn g" type="button" id="incAi" hidden>Confronta con l'AI</button><button class="btn g s" type="button" id="incPul">Svuota</button></div>
+   <div class="row"><button class="btn" type="button" id="incGo">Leggi il testo</button><button class="btn g" type="button" id="incRi">↻ Riprova (lettura più larga)</button><button class="btn g" type="button" id="incAi" hidden>🤖 Controlla con l'AI · usa token AI</button><button class="btn g s" type="button" id="incPul">Svuota</button></div>
    <p class="hint">Il testo non viene salvato. Dopo la lettura controllo i codici, le cifre di controllo e, se hai fotografato il documento, confronto foto e testo.</p>
    <p class="msg" id="mI" role="status"></p>
    <div id="rev" hidden></div>
   </div>
  </details>
  <label class="drop big" id="drop"><b>📷 Fotografa i documenti</b><span>Leggo le righe &lt;&lt;&lt; e il testo del documento qui sul telefono, poi li confronto. Ci mette qualche secondo per foto. Poi controlli tu.</span><input type="file" id="foto" accept="image/*" multiple></label>
+ <div class="row" id="fotoRow" hidden><button class="btn g" type="button" id="fotoRi">↻ Riprova a leggere le foto</button><button class="btn g" type="button" id="fotoAi" hidden>🤖 Leggi le foto con l'AI · usa token AI</button></div>
+ <p class="hint" id="fotoHint" hidden>L'AI è facoltativa e consuma token (costa): usala solo se la lettura sul telefono non basta.</p>
  <div class="grid2">
   <label>Giorno di arrivo<input type="date" id="arr"></label>
   <label>Notti<input type="number" id="notti" inputmode="numeric" min="1" max="30" step="1" value="1"></label>
@@ -232,7 +234,7 @@ function capoTipo(){return G.length<2?"16":tipo==="f"?"17":"18"}
 function membroTipo(){return tipo==="f"?"19":"20"}
 var F={cognome:"Cognome",nome:"Nome",sesso:"Sesso",nascita:"Data di nascita",statoN:"Stato di nascita",comuneN:"Comune di nascita",citt:"Cittadinanza",doc:"Documento",num:"Numero del documento",ril:"Rilasciato a"};
 function campo(g,k,html,dubbio){var cls=(dubbio?" dubbio":"")+(g._manca&&g._manca[k]?" manca":""),m=g._msg&&g._msg[k]?'<small class="cm ko">'+esc(g._msg[k])+"</small>":g._avv&&g._avv[k]?'<small class="cm av">'+esc(g._avv[k])+"</small>":"";return'<label class="'+cls+'"><span class="t">'+F[k]+"</span>"+html+m+"</label>"}
-function render(){var box=$("ospiti");box.innerHTML="";$("tipoBox").hidden=G.length<2;$("incAi").hidden=!ST.ai;$("bar").hidden=!G.length;
+function render(){var box=$("ospiti");box.innerHTML="";$("tipoBox").hidden=G.length<2;$("incAi").hidden=!ST.ai;$("fotoAi").hidden=!ST.ai||!ULTIME.length;$("bar").hidden=!G.length;
  G.forEach(function(g,i){var capo=i===0,d=document.createElement("div");d.className="ospite"+(ESITI&&ESITI[i]?(ESITI[i].ok?" ok":" err"):"");d.dataset.id=g.id;
   var ruolo=G.length<2?"Ospite singolo":capo?(tipo==="f"?"Capofamiglia":"Capogruppo"):(tipo==="f"?"Familiare":"Membro del gruppo");
   var h='<div class="o-top"><h3>'+(esc((g.cognome+" "+g.nome).trim())||"Ospite "+(i+1))+"<small>"+ruolo+'</small></h3><div class="row" style="gap:6px">'+(capo?"":'<button class="btn g s" type="button" data-a="capo">Rendi '+(tipo==="f"?"capofamiglia":"capogruppo")+"</button>")+'<button class="btn ko s" type="button" data-a="via" aria-label="Togli ospite">✕</button></div></div>';
@@ -302,11 +304,30 @@ function leggiMRZ(w,im){var giri=[0,90,270,180],i=0;
  return prova()}
 /* testo completo della foto (non solo le righe <<<): lo si scrive nella casella «Incolla il testo» e si legge come se fosse incollato */
 var TESTI=[],TESTI_RAW="",WL="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<";
-function testoFoto(w,im){var giri=[0,90,270,180],i=0,best="";
+function testoFoto(w,im,psm){var giri=[0,90,270,180],i=0,best="";
  function prova(){if(i>=giri.length)return best;var c=tela(im,giri[i++],2000);
   return w.recognize(c).then(function(r){var t=(r.data&&r.data.text)||"";if(INC.persone(t).length)return t;if(t.length>best.length)best=t;return prova()})}
- return w.setParameters({tessedit_char_whitelist:"",tessedit_pageseg_mode:"6"}).then(prova).catch(function(){return best})
+ return w.setParameters({tessedit_char_whitelist:"",tessedit_pageseg_mode:psm||"6"}).then(prova).catch(function(){return best})
   .then(function(t){return w.setParameters({tessedit_char_whitelist:WL,tessedit_pageseg_mode:"6"}).then(function(){return t},function(){return t})})}
+var ULTIME=[],FILES=[],TUTTI=[];
+/* riprova sulle foto: stesse immagini, altri modi di leggere la pagina (a blocchi, testo sparso), sia scansionate sia originali; per ogni foto tiene il testo che dà più campi */
+function fasce(im){var W=im.width,H=im.height,bh=Math.round(W*0.8),st=Math.round(bh/2),out=[];if(H<W*1.5)return out; /* screenshot alto: la carta è una fascia piccola dentro lo schermo */
+ for(var y=0;y<H-st;y+=st){var h=Math.min(bh,H-y),c=document.createElement("canvas");c.width=W;c.height=h;c.getContext("2d").drawImage(im,0,y,W,h,0,0,W,h);out.push(c)}return out}
+function testoFasce(w,im,psm){var f=fasce(im),t=[];return f.reduce(function(pr,c){return pr.then(function(){return testoFoto(w,c,psm).then(function(x){if(x)t.push(x)})})},Promise.resolve()).then(function(){return t.join("\n")})}
+function riprovaFoto(){if(!ULTIME.length)return say($("mL"),"Prima carica una foto.");
+ var btn=$("fotoRi");btn.disabled=true;say($("mL"),"Riprovo in altri modi… può volerci un minuto.",true);
+ lettore().then(function(w){var vol=[];ULTIME.forEach(function(u){[u.sc,u.im].forEach(function(im){if(im)["4","11","3"].forEach(function(m){vol.push({im:im,m:m})})})});
+  var best=[],k=0;TUTTI=[];
+  return vol.reduce(function(pr,v,i){return pr.then(function(){say($("mL"),"Riprovo… "+(i+1)+" di "+vol.length,true);var gi=Math.floor(i/6);
+   return testoFoto(w,v.im,v.m).then(function(t){if(t)TUTTI.push(t);var sc=INC.riempiti(INC.leggi1(t||"",{largo:true}));if(!best[gi]||sc>best[gi].sc)best[gi]={t:t,sc:sc}})})},Promise.resolve())
+  .then(function(){return ULTIME.reduce(function(pr,u){return pr.then(function(){if(!u.im||!fasce(u.im).length)return;say($("mL"),"Foto alta (screenshot): la leggo a fasce…",true);
+    return testoFasce(w,u.im,"6").then(function(t){var sc=INC.riempiti(INC.leggi1(t||"",{largo:true}));if(t&&sc>0){best.push({t:t,sc:sc});TUTTI.push(t)}})})},Promise.resolve())})
+  .then(function(){var testo=best.filter(function(b){return b&&b.t&&b.sc>0}).map(function(b){return b.t}).join("\n\n");
+   if(!testo.trim()){say($("mL"),"Neanche così riesco a leggere. Prova una foto più vicina e con più luce, oppure incolla il testo.");return}
+   TESTI_RAW=testo;$("incT").value=testo;$("inc").open=true;
+   var un=INC.unisci(TUTTI,{largo:true}); /* ogni lettura sbaglia in un punto diverso: per ogni campo vince il valore più frequente */
+   if(un.persone.length&&INC.riempiti(un)>=INC.riempiti(INC.leggi(testo,{largo:true}))){say($("mI"),"Uniti i risultati di "+TUTTI.length+" letture della foto.");mostraRevisione(un.persone)}else leggiIncolla(false,true)})})
+ .catch(function(){say($("mL"),"Il lettore non parte: controlla la connessione e riprova.")}).then(function(){btn.disabled=false})}
 function leggiMRZeTesto(w,im,orig){return leggiMRZ(w,im).then(function(r){return testoFoto(w,im).then(function(tx){
   var buono=r||(tx&&INC.persone(tx).length);
   if(buono||!orig)return{r:r,tx:tx};
@@ -324,17 +345,17 @@ function daMRZ(r,foto){var g=nuovo({cognome:r.cognome,nome:r.nome,sesso:r.sesso,
  return g}
 $("foto").addEventListener("change",function(){var fs=[].slice.call(this.files||[]);this.value="";if(!fs.length)return;
  if(fs.length>6){say($("mL"),"Al massimo 6 foto per volta: leggo le prime 6.");fs=fs.slice(0,6)}
- $("drop").style.pointerEvents="none";TESTI=[];var nuovi=[],senza=[],n=0,prima=!TESS;
+ $("drop").style.pointerEvents="none";TESTI=[];ULTIME=[];FILES=fs;var nuovi=[],senza=[],n=0,prima=!TESS;
  say($("mL"),prima?"Preparo il lettore (solo la prima volta, qualche secondo)…":"Leggo…",true);
  lettore().then(function(w){
   return fs.reduce(function(pr,f){return pr.then(function(){n++;say($("mL"),"Scansiono e leggo la foto "+n+" di "+fs.length+"…",true);
-   return immagine(f).then(function(x){return scansiona(x.im).then(function(sc){var u=anteprima(sc||x.im);return leggiMRZeTesto(w,sc||x.im,sc?x.im:null).then(function(r){URL.revokeObjectURL(x.u);
+   return immagine(f).then(function(x){return scansiona(x.im).then(function(sc){var u=anteprima(sc||x.im);ULTIME.push({sc:sc,im:x.im});return leggiMRZeTesto(w,sc||x.im,sc?x.im:null).then(function(r){URL.revokeObjectURL(x.u);
     if(r){var g=daMRZ(r,senza.concat([u]));senza=[];nuovi.push(g)}else senza.push(u)})})})})},Promise.resolve())})
  .then(function(){
   if(senza.length&&nuovi.length){nuovi[nuovi.length-1].foto=nuovi[nuovi.length-1].foto.concat(senza);senza=[]}
   var gt=INC.leggi(TESTI.join("\n\n")).persone.map(daTesto);TESTI_RAW=TESTI.join("\n\n");
   if(gt.length===1&&!nuovi.length){gt[0].foto=senza.slice();senza=[]}
-  if(!nuovi.length&&!gt.length&&senza.length&&ST.ai){say($("mL"),"Non trovo le righe <<<: provo con l'AI…",true);return leggiConAI(fs)}
+  $("fotoRow").hidden=false;$("fotoAi").hidden=!ST.ai;$("fotoHint").hidden=!ST.ai;
   nuovi.forEach(aggiungi);gt.forEach(aggiungi);
   if(!nuovi.length&&!gt.length){var g=nuovo();g.foto=senza;G.push(g);if(TESTI_RAW.trim()){$("incT").value=TESTI_RAW;$("inc").open=true}}
   ESITI=null;render();
@@ -372,6 +393,8 @@ function adatta(p){var q={};for(var k in p)q[k]=p[k];q.dubbi=(p.dubbi||[]).slice
   if(c){q.comune_nascita=q.luogo_nascita;q.provincia_nascita=q.provincia_nascita||c.p;q.stato_nascita="ITALIA"}
   else{var st=trova(TAB.stati,q.luogo_nascita);if(st)q.stato_nascita=st.n;else{q.dubbi.push("stato_nascita");if(q.cittadinanza)q.stato_nascita=q.cittadinanza}}}
  if(!q.stato_nascita&&!q.comune_nascita&&q.cittadinanza){q.stato_nascita=q.cittadinanza;q.dubbi.push("stato_nascita")}
+ var STOR={SUN:["URSS","UNIONE SOVIETICA","RUSSIA"],YUG:["JUGOSLAVIA","SERBIA"],CSK:["CECOSLOVACCHIA","REPUBBLICA CECA","SLOVACCHIA"],DDR:["GERMANIA"]};
+ if(q.stato_nascita&&STOR[q.stato_nascita]){var hs=STOR[q.stato_nascita].map(function(n){return trova(TAB.stati,n)}).filter(Boolean)[0];if(hs)q.stato_nascita=hs.n;q.dubbi.push("stato_nascita")} /* paese che non esiste più: da controllare */
  if(q.stato_nascita&&/^[A-Z]{3}$/.test(q.stato_nascita)&&MRZ.PAESI[q.stato_nascita])q.stato_nascita=MRZ.PAESI[q.stato_nascita];
  if(q.rilascio_testo&&!q.rilascio_comune&&!q.rilascio_stato){var t=norm(q.rilascio_testo),m=/(?:COMUNE|QUESTURA|PREFETTURA|MUNICIPIO|QUESTURA|COMMISSARIATO)\s+(?:DI\s+)?(.+)$/.exec(t);
   if(/\bMIT\b|MINISTERO|\bMAE\b|MOTORIZZAZIONE|\bUCO\b|AFFARI ESTERI/.test(t))q.rilascio_comune="ROMA";else if(m)q.rilascio_comune=m[1];
@@ -383,8 +406,8 @@ function daTesto(p){var q=adatta(p),g=daAI(q,[]);g.src={testo:1};g.mrz=p.mrz||nu
  if(p.avvisi&&p.avvisi.length){g.conf=p.avvisi.join(" ");g.confOk=false}
  else if(p.fonti&&p.fonti.length>1){g.conf="Testo e righe MRZ coincidono.";g.confOk=true}
  return g}
-function leggiIncolla(usaAI){var t=$("incT").value;if(!t.trim())return say($("mI"),"Incolla prima il testo del documento.");
- var loc=INC.leggi(t),fine=function(P,nota){
+function leggiIncolla(usaAI,larga){var t=$("incT").value;if(!t.trim())return say($("mI"),"Incolla prima il testo del documento.");
+ var loc=INC.leggi(t,{largo:!!larga}),fine=function(P,nota){
   if(!P.length)return say($("mI"),(nota||(loc.note[0]||"Non ho trovato dati nel testo."))+" Prova a incollare anche le righe con <<<, oppure compila a mano.");
   mostraRevisione(P)};
  if(!usaAI)return fine(loc.persone);
@@ -395,7 +418,10 @@ function leggiIncolla(usaAI){var t=$("incT").value;if(!t.trim())return say($("mI
    ["cognome","nome","sesso","data_nascita","numero_documento","comune_nascita","provincia_nascita","stato_nascita","cittadinanza","tipo_documento","rilascio_comune","rilascio_stato"].forEach(function(k){if(!l[k]&&a[k])l[k]=a[k]});
    l.avvisi=(l.avvisi||[]).concat(dif.length?["Lettura locale e AI non coincidono su: "+dif.join(", ")+"."]:[])});
   fine(P)}).catch(function(e){say($("mI"),e.code==="ai_mancante"?"L'AI non è collegata: uso solo la lettura sul telefono.":"L'AI non ha risposto: uso solo la lettura sul telefono.");fine(loc.persone)})}
-$("incGo").onclick=function(){leggiIncolla(false)};
+$("incGo").onclick=function(){leggiIncolla(false,false)};
+$("incRi").onclick=function(){leggiIncolla(false,true)};
+$("fotoRi").onclick=riprovaFoto;
+$("fotoAi").onclick=function(){if(!FILES.length)return;if(!confirm("Leggo le foto con l'AI. Consuma token AI. Procedo?"))return;say($("mL"),"Leggo con l'AI…",true);leggiConAI(FILES)};
 $("incAi").onclick=function(){leggiIncolla(true)};
 $("incPul").onclick=function(){$("incT").value="";say($("mI"),"",true)};
 
@@ -406,6 +432,7 @@ function luogoDi(g){var st=g.statoN?perCodice(g.statoN):null;if(!st)return"";if(
 function mostraRevisione(P){
  var box=$("rev");REV=P.map(function(p){var g=daTesto(p);g.src={testo:1};var r=CTL.ospite(g,{arrivo:$("arr").value||iso(new Date()),capo:true,perCodice:perCodice,doc:TAB.doc});return{g:g,p:p,err:r.err,avv:r.avv,eta:etaDi(g),ok:true,dup:G.some(function(e){return stessa(e,g)})}});
  REV.sort(function(a,b){return(b.eta||0)-(a.eta||0)});
+ REV.forEach(function(r,i){if(i>0){var c=CTL.ospite(r.g,{arrivo:$("arr").value||iso(new Date()),capo:false,perCodice:perCodice,doc:TAB.doc});r.err=c.err;r.avv=c.avv}}); /* solo il capo ha bisogno del documento */
  box.innerHTML="";box.className="rev";box.hidden=false;
  var t=document.createElement("p");t.className="hint";t.innerHTML="<b>Controlla prima di inserire.</b> Ho letto "+REV.length+" person"+(REV.length===1?"a":"e")+": togli la spunta a chi non va inserito. Chi è più grande sarà il capo.";box.appendChild(t);
  REV.forEach(function(r,i){var g=r.g,d=document.createElement("div"),n=Object.keys(r.err).length,dub=Object.keys(g.dubbi||{}).length;d.className="p";

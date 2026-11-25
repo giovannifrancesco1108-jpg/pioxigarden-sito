@@ -8,6 +8,7 @@ Pannello admin (`/admin/alloggiati/`) + worker Cloudflare che invia le schedine 
 - (scanner in `admin/alloggiati/scanner.js`, prove incluse in `tests/alloggiati.test.js`)
 - `node tests/corpus/run.js` – 185 documenti sintetici di 39 nazionalità, 150 incolla (singoli, coppie, terzetti). Deve dare 100%.
 - `node tests/corpus/run.js --duro --errori` – versione "sporca" (O/0, minuscole, righe spazzatura, documenti attaccati). Elenca i campi sbagliati: è la lista di cosa migliorare. Opzioni: `--tipo=`, `--min=`.
+- `node tests/corpus/layout.js [--sporco] [--errori]` – 360 documenti in inglese con 6 impaginazioni diverse (etichetta:valore, sopra, sotto, elenco, coppie). Normale ~95%, `--sporco` ~49% (righe spazzatura tra etichetta e valore): è il punto da migliorare.
 
 ## Regole
 1. Solo dati sintetici nei test. Mai dati reali di ospiti nel repo, nei log o nei test.
