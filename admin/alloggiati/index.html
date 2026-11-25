@@ -7,6 +7,12 @@
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#17464d">
 <title>Alloggiati Web · Pio XI</title>
+<link rel="manifest" href="/admin/alloggiati/app.webmanifest">
+<link rel="apple-touch-icon" href="/admin/alloggiati/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Alloggiati">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700&display=swap">
 <style>
@@ -66,7 +72,7 @@ details[open].card>summary::after{content:"▴"}
 .conf{border:1px solid var(--gold);border-radius:16px;padding:14px;display:grid;gap:10px;background:rgba(240,193,120,.08)}
 .log{display:grid;gap:6px;font-size:14px;color:var(--mute);margin:0;padding:0;list-style:none;font-variant-numeric:tabular-nums}
 .drop{display:grid;place-items:center;gap:6px;text-align:center;border:1.5px dashed rgba(240,193,120,.55);border-radius:18px;padding:22px 16px;cursor:pointer;color:var(--fg);background:rgba(240,193,120,.05)}
-.drop b{font-size:18px}.drop span{font-size:14px;color:var(--mute)}
+.drop b{font-size:18px}.drop.big{padding:30px 16px;background:rgba(240,193,120,.12)}.drop.big b{font-size:22px}.drop span{font-size:14px;color:var(--mute)}
 .drop input{position:absolute;width:1px;height:1px;opacity:0}
 .zoom{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.9);display:grid;place-items:center;padding:16px}
 .zoom img{max-width:100%;max-height:100%;border-radius:10px}
@@ -78,7 +84,18 @@ details[open].card>summary::after{content:"▴"}
 <main>
 <header><h1>Alloggiati Web<small>Comunicazione degli ospiti alla Questura</small></h1><a class="btn g s" href="/admin/">← Pannello</a></header>
 
-<p class="safe" id="nota">🔒 Foto e dati degli ospiti non vengono salvati sul sito: restano su questo telefono finché la pagina è aperta e vanno solo al portale della Polizia di Stato e, per la lettura automatica, all'AI (Claude, di Anthropic). Come chiede il portale, i dati si prendono dal documento con l'ospite presente.</p>
+<section class="card" id="auth" hidden>
+ <h2>Accedi</h2>
+ <p>La stessa password del pannello. Resti dentro per 30 giorni.</p>
+ <form id="authF" style="display:grid;gap:12px">
+  <label>Password<input type="password" id="pw" autocomplete="current-password" required minlength="8"></label>
+  <button class="btn" type="submit" id="authB">Entra</button>
+  <p class="msg" id="authM" role="status"></p>
+ </form>
+</section>
+
+<div id="tool" hidden style="display:grid;gap:18px">
+<p class="safe" id="nota">🔒 Foto e dati degli ospiti non vengono salvati: vanno solo al portale della Polizia e, per la lettura, all'AI.</p>
 
 <details class="card" id="cfg">
  <summary><h2>Collegamenti</h2><span class="row" style="gap:6px"><span class="pill" id="pPort"><i></i><span>Portale</span></span><span class="pill" id="pAi"><i></i><span>Lettura AI</span></span></span></summary>
@@ -109,6 +126,7 @@ details[open].card>summary::after{content:"▴"}
 
 <section class="card" id="nuova">
  <h2>Nuova comunicazione</h2>
+ <label class="drop big" id="drop"><b>📷 Fotografa i documenti</b><span>Uno o più documenti, anche fronte e retro: li leggo e compilo io. Poi controlli tu.</span><input type="file" id="foto" accept="image/*" multiple></label>
  <div class="grid2">
   <label>Giorno di arrivo<input type="date" id="arr"></label>
   <label>Notti<input type="number" id="notti" inputmode="numeric" min="1" max="30" step="1" value="1"></label>
@@ -120,7 +138,6 @@ details[open].card>summary::after{content:"▴"}
   <div class="seg" id="tipo"><button type="button" data-t="g" aria-pressed="true">Un gruppo</button><button type="button" data-t="f" aria-pressed="false">Una famiglia</button></div>
  </div>
  <div id="ospiti" style="display:grid;gap:14px"></div>
- <label class="drop" id="drop"><b>📷 Fotografa i documenti</b><span>Uno o più documenti, anche fronte e retro: li leggo e compilo io. Poi controlli tu.</span><input type="file" id="foto" accept="image/*" multiple></label>
  <div class="row"><button class="btn g s" type="button" id="aMano">✍️ Aggiungi un ospite a mano</button><p class="msg" id="mL" role="status"></p></div>
  <div id="conf" class="conf" hidden>
   <b id="confT"></b>
@@ -129,7 +146,7 @@ details[open].card>summary::after{content:"▴"}
  <p class="msg" id="mS" role="status" aria-live="polite"></p>
 </section>
 
-<section class="card">
+<section class="card" id="ricev">
  <h2>Ricevute</h2>
  <p>La ricevuta di un giorno il portale la prepara dal giorno dopo.</p>
  <div class="row"><label style="flex:1 1 180px">Giorno dell'invio<input type="date" id="rData"></label><button class="btn g" type="button" id="rGo" style="align-self:end">Scarica la ricevuta</button></div>
@@ -137,6 +154,7 @@ details[open].card>summary::after{content:"▴"}
  <h3>Ultimi invii</h3>
  <ul class="log" id="log"><li>Nessun invio da qui.</li></ul>
 </section>
+</div>
 </main>
 
 <div class="bar" id="bar" hidden><div>
@@ -292,7 +310,7 @@ function stato(j){ST=Object.assign(ST,j);
  $("portTxt").textContent=j.portale?"Collegato come "+j.utente+(j.fonte==="cloudflare"?" (dai segreti di Cloudflare)":"")+". "+(j.tabelle?"Tabelle aggiornate il "+new Date(j.tabelle.aggiornate).toLocaleDateString("it")+".":"Tabelle non ancora scaricate."):"";
  $("cDel").hidden=j.fonte==="cloudflare";
  $("aiOff").hidden=!!j.ai;$("aiOn").hidden=!j.ai;$("aiTxt").textContent=j.aiFonte==="cloudflare"?"Lettura attiva (chiave nei segreti di Cloudflare).":"Lettura attiva.";$("aDel").hidden=j.aiFonte==="cloudflare";
- if(!j.portale||!j.ai)$("cfg").open=true;
+ var cfg=$("cfg"),tool=$("tool");if(!j.portale||!j.ai){cfg.open=true;tool.insertBefore(cfg,$("nuova"))}else{cfg.open=false;tool.appendChild(cfg)}
  var L=$("log");L.innerHTML="";(j.registro||[]).forEach(function(v){var li=document.createElement("li");li.textContent=new Date(v.ts).toLocaleString("it",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})+" · "+v.valide+"/"+v.n+" schedine"+(v.arrivo?" · arrivo "+dataIt(v.arrivo):"")+(v.valide===v.n?" ✓":" ⚠️");L.appendChild(li)});
  if(!L.children.length)L.innerHTML="<li>Nessun invio da qui.</li>"}
 function caricaStato(){return api("GET","stato").then(stato)}
@@ -315,9 +333,14 @@ $("rGo").onclick=function(){var d=$("rData").value;if(!d)return say($("mR"),"Sce
  .catch(function(j){say($("mR"),j&&j.detail?j.detail:"Ricevuta non disponibile per quel giorno.")}).then(function(){$("rGo").disabled=false})};
 
 /* ---------- avvio: serve l'accesso al pannello ---------- */
-fetch("/api/admin/me",{credentials:"same-origin"}).then(function(r){return r.json()}).then(function(me){if(!me.admin){location.replace("/admin/");return}
- var t=new Date();$("arr").value=iso(t);$("rData").value=iso(new Date(t.getTime()-864e5));avvisoArrivo();
- caricaStato().then(function(){if(ST.tabelle)return caricaTabelle();render()}).catch(function(){say($("mS"),"Server non raggiungibile. Riprova.")})}).catch(function(){location.replace("/admin/")});
+$("authF").addEventListener("submit",function(e){e.preventDefault();var p=$("pw").value;$("authB").disabled=true;
+ fetch("/api/admin/login",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json","X-PX":"1"},body:JSON.stringify({password:p})}).then(function(r){if(r.ok)return location.reload();
+  return r.json().catch(function(){return{}}).then(function(j){say($("authM"),j.error==="wait"?"Troppi tentativi: riprova tra 15 minuti.":"Password sbagliata.")})}).catch(function(){say($("authM"),"Server non raggiungibile.")}).then(function(){$("authB").disabled=false})});
+fetch("/api/admin/me",{credentials:"same-origin"}).then(function(r){return r.json()}).then(function(me){
+ if(me.setup){location.replace("/admin/");return}
+ if(!me.admin){$("auth").hidden=false;$("pw").focus();return}
+ $("tool").hidden=false;var t=new Date();$("arr").value=iso(t);$("rData").value=iso(new Date(t.getTime()-864e5));avvisoArrivo();
+ caricaStato().then(function(){if(ST.tabelle)return caricaTabelle();render()}).catch(function(){say($("mS"),"Server non raggiungibile. Riprova.")})}).catch(function(){$("auth").hidden=false;say($("authM"),"Server non raggiungibile. Riprova.")});
 })();
 </script>
 </body>
