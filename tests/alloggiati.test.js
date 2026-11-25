@@ -163,3 +163,33 @@ console.log(n + " prove superate");
   assert.equal(b.cognome, "VERDI"); assert.equal(b.nome, "PAOLO");
   console.log("ok  patente con OCR sporco (rumore, numeri su righe separate)");
 })();
+
+// ---- OCR sporco e più letture della stessa foto (dati INVENTATI) ----
+(function () {
+  // sporcizia ai lati dei valori, provincia storpiata, etichetta letta come valore
+  const t = "REPUBBLICA ITALIANA\nCARTA DI IDENTITA / IDENTITY CARD\nCOMUNE DI\nROMA\nCOGNOME / SURNAME\nBIANCHI % E ve\nNOME / NAME\neal _ = \\\nLUCA\nLUOGO E DATA DI NASCITA\nSIENA{S1) 12.03.1985\nSESSO STATURA CITTADINANZA\nM 180 ITA\nCA12345AB";
+  const p = INC.leggi(t).persone[0];
+  assert.equal(p.cognome, "BIANCHI"); assert.equal(p.nome, "LUCA");
+  assert.equal(p.comune_nascita, "SIENA"); assert.equal(p.provincia_nascita, "SI");
+  // il riempitivo della MRZ letto «cccc» non finisce nel nome
+  const m = INC.leggi("Surname\nJOB\nGiven names\nELEANOR ALEXANDRA CCECCEECEGCC\nDate of birth\n24 APR 98\nSex\nF").persone[0];
+  assert.equal(m.nome, "ELEANOR ALEXANDRA");
+  // la patente non ha sesso né cittadinanza: non se li inventa
+  const pat = INC.leggi("PATENTE DI GUIDA REPUBBLICA ITALIANA\n1. DONATO\n2. PAOLO\n3. 16/02/73 GENOVA (GE)\n5. U188L2809S\n9. AB\nF").persone[0];
+  assert.ok(!pat.sesso && !pat.cittadinanza);
+  console.log("ok  OCR sporco: simboli ai lati, provincia {S1), riempitivo MRZ, patente");
+})();
+(function () {
+  const buona = "Surname\nNOVAK\nGiven names\nJANA\nDate of birth\n03.05.1985\nSex\nF\nNationality\nCZE\nPassport No\nAB1234567";
+  const senzaCitt = "Surname\nNOVAK\nGiven names\nJANA\nDate of birth\n03.05.1985\nSex\nF\nPassport No\nAB1234567";
+  const senzaData = "Surname\nNOVAK\nGiven names\nJANA\nNationality\nCZE\nSex\nF\nPassport No\nAB1234567";
+  const rumore = "xx\nSurname\nNOVAC\nGiven names\nJANA\nDate of birth\n03.05.1985";
+  const u = INC.unisci([senzaCitt, senzaData, rumore, buona]);
+  assert.equal(u.persone.length, 1, "una sola persona");
+  const p = u.persone[0];
+  assert.equal(p.cognome, "NOVAK"); assert.equal(p.data_nascita, "03/05/1985"); assert.equal(p.cittadinanza, "CZE"); assert.equal(p.numero_documento, "AB1234567");
+  // due persone diverse nella stessa foto restano due
+  const altra = "Surname\nKOVAC\nGiven names\nPETER\nDate of birth\n11.11.1970\nSex\nM\nNationality\nSVK\nPassport No\nCD7654321";
+  assert.equal(INC.unisci([buona, altra, buona, altra]).persone.length, 2);
+  console.log("ok  più letture della stessa foto unite con il voto");
+})();

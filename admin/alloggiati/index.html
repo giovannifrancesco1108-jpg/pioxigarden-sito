@@ -85,7 +85,7 @@ details[open].card>summary::after{content:"▴"}
 </head>
 <body>
 <main>
-<header><h1>Alloggiati Web<small>Comunicazione degli ospiti alla Questura</small></h1><p style="margin:4px 0 0;font-weight:700;color:#0a7a3d">VERSIONE 10 · PATENTE, CIE E SCREENSHOT</p><a class="btn g s" href="/admin/">← Pannello</a></header>
+<header><h1>Alloggiati Web<small>Comunicazione degli ospiti alla Questura</small></h1><p style="margin:4px 0 0;font-weight:700;color:#0a7a3d">VERSIONE 11 · LETTURE UNITE E TESTO PULITO</p><a class="btn g s" href="/admin/">← Pannello</a></header>
 
 <section class="card" id="auth" hidden>
  <h2>Accedi</h2>
@@ -309,7 +309,7 @@ function testoFoto(w,im,psm){var giri=[0,90,270,180],i=0,best="";
   return w.recognize(c).then(function(r){var t=(r.data&&r.data.text)||"";if(INC.persone(t).length)return t;if(t.length>best.length)best=t;return prova()})}
  return w.setParameters({tessedit_char_whitelist:"",tessedit_pageseg_mode:psm||"6"}).then(prova).catch(function(){return best})
   .then(function(t){return w.setParameters({tessedit_char_whitelist:WL,tessedit_pageseg_mode:"6"}).then(function(){return t},function(){return t})})}
-var ULTIME=[],FILES=[];
+var ULTIME=[],FILES=[],TUTTI=[];
 /* riprova sulle foto: stesse immagini, altri modi di leggere la pagina (a blocchi, testo sparso), sia scansionate sia originali; per ogni foto tiene il testo che dà più campi */
 function fasce(im){var W=im.width,H=im.height,bh=Math.round(W*0.8),st=Math.round(bh/2),out=[];if(H<W*1.5)return out; /* screenshot alto: la carta è una fascia piccola dentro lo schermo */
  for(var y=0;y<H-st;y+=st){var h=Math.min(bh,H-y),c=document.createElement("canvas");c.width=W;c.height=h;c.getContext("2d").drawImage(im,0,y,W,h,0,0,W,h);out.push(c)}return out}
@@ -317,14 +317,16 @@ function testoFasce(w,im,psm){var f=fasce(im),t=[];return f.reduce(function(pr,c
 function riprovaFoto(){if(!ULTIME.length)return say($("mL"),"Prima carica una foto.");
  var btn=$("fotoRi");btn.disabled=true;say($("mL"),"Riprovo in altri modi… può volerci un minuto.",true);
  lettore().then(function(w){var vol=[];ULTIME.forEach(function(u){[u.sc,u.im].forEach(function(im){if(im)["4","11","3"].forEach(function(m){vol.push({im:im,m:m})})})});
-  var best=[],k=0;
+  var best=[],k=0;TUTTI=[];
   return vol.reduce(function(pr,v,i){return pr.then(function(){say($("mL"),"Riprovo… "+(i+1)+" di "+vol.length,true);var gi=Math.floor(i/6);
-   return testoFoto(w,v.im,v.m).then(function(t){var sc=INC.riempiti(INC.leggi1(t||"",{largo:true}));if(!best[gi]||sc>best[gi].sc)best[gi]={t:t,sc:sc}})})},Promise.resolve())
+   return testoFoto(w,v.im,v.m).then(function(t){if(t)TUTTI.push(t);var sc=INC.riempiti(INC.leggi1(t||"",{largo:true}));if(!best[gi]||sc>best[gi].sc)best[gi]={t:t,sc:sc}})})},Promise.resolve())
   .then(function(){return ULTIME.reduce(function(pr,u){return pr.then(function(){if(!u.im||!fasce(u.im).length)return;say($("mL"),"Foto alta (screenshot): la leggo a fasce…",true);
-    return testoFasce(w,u.im,"6").then(function(t){var sc=INC.riempiti(INC.leggi1(t||"",{largo:true}));if(t&&sc>0)best.push({t:t,sc:sc})})})},Promise.resolve())})
+    return testoFasce(w,u.im,"6").then(function(t){var sc=INC.riempiti(INC.leggi1(t||"",{largo:true}));if(t&&sc>0){best.push({t:t,sc:sc});TUTTI.push(t)}})})},Promise.resolve())})
   .then(function(){var testo=best.filter(function(b){return b&&b.t&&b.sc>0}).map(function(b){return b.t}).join("\n\n");
    if(!testo.trim()){say($("mL"),"Neanche così riesco a leggere. Prova una foto più vicina e con più luce, oppure incolla il testo.");return}
-   TESTI_RAW=testo;$("incT").value=testo;$("inc").open=true;leggiIncolla(false,true)})})
+   TESTI_RAW=testo;$("incT").value=testo;$("inc").open=true;
+   var un=INC.unisci(TUTTI,{largo:true}); /* ogni lettura sbaglia in un punto diverso: per ogni campo vince il valore più frequente */
+   if(un.persone.length&&INC.riempiti(un)>=INC.riempiti(INC.leggi(testo,{largo:true}))){say($("mI"),"Uniti i risultati di "+TUTTI.length+" letture della foto.");mostraRevisione(un.persone)}else leggiIncolla(false,true)})})
  .catch(function(){say($("mL"),"Il lettore non parte: controlla la connessione e riprova.")}).then(function(){btn.disabled=false})}
 function leggiMRZeTesto(w,im,orig){return leggiMRZ(w,im).then(function(r){return testoFoto(w,im).then(function(tx){
   var buono=r||(tx&&INC.persone(tx).length);
