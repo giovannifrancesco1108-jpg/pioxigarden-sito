@@ -84,7 +84,7 @@ details[open].card>summary::after{content:"▴"}
 </head>
 <body>
 <main>
-<header><h1>Alloggiati Web<small>Comunicazione degli ospiti alla Questura</small></h1><p style="margin:4px 0 0;font-weight:700;color:#0a7a3d">VERSIONE 5 · INCOLLA TESTO + CONTROLLI</p><a class="btn g s" href="/admin/">← Pannello</a></header>
+<header><h1>Alloggiati Web<small>Comunicazione degli ospiti alla Questura</small></h1><p style="margin:4px 0 0;font-weight:700;color:#0a7a3d">VERSIONE 6 · FOTO → TESTO → COMPILAZIONE (OFFLINE)</p><a class="btn g s" href="/admin/">← Pannello</a></header>
 
 <section class="card" id="auth" hidden>
  <h2>Accedi</h2>
@@ -138,7 +138,7 @@ details[open].card>summary::after{content:"▴"}
    <p class="msg" id="mI" role="status"></p>
   </div>
  </details>
- <label class="drop big" id="drop"><b>📷 Fotografa i documenti</b><span>Il lato con le righe &lt;&lt;&lt; (passaporto, retro della carta d'identità): leggo i dati qui sul telefono. Poi controlli tu.</span><input type="file" id="foto" accept="image/*" multiple></label>
+ <label class="drop big" id="drop"><b>📷 Fotografa i documenti</b><span>Leggo le righe &lt;&lt;&lt; e il testo del documento qui sul telefono, poi li confronto. Ci mette qualche secondo per foto. Poi controlli tu.</span><input type="file" id="foto" accept="image/*" multiple></label>
  <div class="grid2">
   <label>Giorno di arrivo<input type="date" id="arr"></label>
   <label>Notti<input type="number" id="notti" inputmode="numeric" min="1" max="30" step="1" value="1"></label>
@@ -284,6 +284,14 @@ function leggiMRZ(w,im){var giri=[0,90,270,180],i=0;
  function prova(){if(i>=giri.length)return Promise.resolve(null);var c=tela(im,giri[i++],2000);
   return w.recognize(c).then(function(r){var x=MRZ.leggi(r.data.text);return x||prova()})}
  return prova()}
+/* testo completo della foto (non solo le righe <<<): lo si scrive nella casella «Incolla il testo» e si legge come se fosse incollato */
+var TESTI=[],TESTI_RAW="",WL="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<";
+function testoFoto(w,im){var giri=[0,90,270,180],i=0,best="";
+ function prova(){if(i>=giri.length)return best;var c=tela(im,giri[i++],2000);
+  return w.recognize(c).then(function(r){var t=(r.data&&r.data.text)||"";if(INC.persone(t).length)return t;if(t.length>best.length)best=t;return prova()})}
+ return w.setParameters({tessedit_char_whitelist:"",tessedit_pageseg_mode:"6"}).then(prova).catch(function(){return best})
+  .then(function(t){return w.setParameters({tessedit_char_whitelist:WL,tessedit_pageseg_mode:"6"}).then(function(){return t},function(){return t})})}
+function leggiMRZeTesto(w,im){return leggiMRZ(w,im).then(function(r){return testoFoto(w,im).then(function(tx){if(tx)TESTI.push(tx);return r})})}
 function daMRZ(r,foto){var g=nuovo({cognome:r.cognome,nome:r.nome,sesso:r.sesso,data_nascita:r.nascita,numero_documento:r.numero});g.foto=foto;g.mrz=r;g.src={foto:1};
  var paese=function(c){return MRZ.PAESI[c]?trova(TAB.stati,MRZ.PAESI[c]):null},naz=paese(r.nazionalita),em=paese(r.emittente);
  if(naz){g.citt=naz.c;g.statoN=naz.c}else g.dubbi.cittadinanza=1;
@@ -296,19 +304,22 @@ function daMRZ(r,foto){var g=nuovo({cognome:r.cognome,nome:r.nome,sesso:r.sesso,
  return g}
 $("foto").addEventListener("change",function(){var fs=[].slice.call(this.files||[]);this.value="";if(!fs.length)return;
  if(fs.length>6){say($("mL"),"Al massimo 6 foto per volta: leggo le prime 6.");fs=fs.slice(0,6)}
- $("drop").style.pointerEvents="none";var nuovi=[],senza=[],n=0,prima=!TESS;
+ $("drop").style.pointerEvents="none";TESTI=[];var nuovi=[],senza=[],n=0,prima=!TESS;
  say($("mL"),prima?"Preparo il lettore (solo la prima volta, qualche secondo)…":"Leggo…",true);
  lettore().then(function(w){
   return fs.reduce(function(pr,f){return pr.then(function(){n++;say($("mL"),"Leggo la foto "+n+" di "+fs.length+"…",true);
-   return immagine(f).then(function(x){var u=anteprima(x.im);return leggiMRZ(w,x.im).then(function(r){URL.revokeObjectURL(x.u);
+   return immagine(f).then(function(x){var u=anteprima(x.im);return leggiMRZeTesto(w,x.im).then(function(r){URL.revokeObjectURL(x.u);
     if(r){var g=daMRZ(r,senza.concat([u]));senza=[];nuovi.push(g)}else senza.push(u)})})})},Promise.resolve())})
  .then(function(){
   if(senza.length&&nuovi.length){nuovi[nuovi.length-1].foto=nuovi[nuovi.length-1].foto.concat(senza);senza=[]}
-  if(!nuovi.length&&senza.length&&ST.ai){say($("mL"),"Non trovo le righe <<<: provo con l'AI…",true);return leggiConAI(fs)}
-  nuovi.forEach(aggiungi);
-  if(!nuovi.length){var g=nuovo();g.foto=senza;G.push(g)}
+  var gt=INC.leggi(TESTI.join("\n\n")).persone.map(daTesto);TESTI_RAW=TESTI.join("\n\n");
+  if(gt.length===1&&!nuovi.length){gt[0].foto=senza.slice();senza=[]}
+  if(!nuovi.length&&!gt.length&&senza.length&&ST.ai){say($("mL"),"Non trovo le righe <<<: provo con l'AI…",true);return leggiConAI(fs)}
+  nuovi.forEach(aggiungi);gt.forEach(aggiungi);
+  if(!nuovi.length&&!gt.length){var g=nuovo();g.foto=senza;G.push(g);if(TESTI_RAW.trim()){$("incT").value=TESTI_RAW;$("inc").open=true}}
   ESITI=null;render();
-  say($("mL"),nuovi.length?"Letto"+(nuovi.length>1?": "+nuovi.length+" persone":"")+". Completa i campi in giallo guardando la foto (per gli italiani: comune di nascita e luogo di rilascio).":"Non trovo le righe <<< in queste foto: fotografa il lato con le righe <<<, oppure compila guardando la foto.",nuovi.length>0);
+  controlla();render();var tot=Math.max(nuovi.length,gt.length);
+  say($("mL"),tot?"Letto"+(tot>1?": "+tot+" persone":"")+(nuovi.length&&gt.length?" (righe <<< e testo della foto confrontati)":"")+". Controlla i campi in giallo e i messaggi sotto i campi guardando la foto.":"Non riesco a leggere i dati"+(TESTI_RAW.trim()?": ho scritto il testo letto nella casella «Incolla il testo», correggilo e premi «Leggi il testo»":": fotografa il lato con le righe <<<, oppure compila guardando la foto")+".",tot>0);
   $("ospiti").lastElementChild.scrollIntoView({behavior:"smooth",block:"start"})})
  .catch(function(e){say($("mL"),e.message==="lettore"?"Non riesco a scaricare il lettore: controlla la connessione e riprova.":e.message==="foto"?"Questa foto non si apre: prova a fotografare di nuovo.":"Lettura non riuscita: riprova o compila a mano.")})
  .then(function(){$("drop").style.pointerEvents=""})});
@@ -333,7 +344,9 @@ function incrocia(a,b){var pa={cognome:a.cognome,nome:a.nome,sesso:a.sesso,data_
  m.foto=(a.foto||[]).concat(b.foto||[]).slice(0,4);m.src={foto:(a.src&&a.src.foto)||(b.src&&b.src.foto)?1:0,testo:(a.src&&a.src.testo)||(b.src&&b.src.testo)?1:0};
  m.mrz=a.mrz||b.mrz;m.conf=dif.length?"Foto e testo non coincidono su: "+dif.join(", ")+". Tengo i valori con le cifre di controllo: guarda il documento.":"Foto e testo coincidono.";m.confOk=!dif.length;return m}
 function aggiungi(g){for(var i=0;i<G.length;i++){var e=G[i];if(stessa(e,g)&&((g.src&&g.src.foto&&!(e.src&&e.src.foto))||(g.src&&g.src.testo&&!(e.src&&e.src.testo)))){G[i]=incrocia(e,g);return}}G.push(g)}
+var VEI={D:"GERMANIA",F:"FRANCIA",E:"SPAGNA",I:"ITALIA",A:"AUSTRIA",B:"BELGIO",NL:"PAESI BASSI",CH:"SVIZZERA",GB:"REGNO UNITO",PL:"POLONIA",RO:"ROMANIA",P:"PORTOGALLO",USA:"STATI UNITI D'AMERICA",UK:"REGNO UNITO",GR:"GRECIA",H:"UNGHERIA",CZ:"CECA, REPUBBLICA",SK:"SLOVACCHIA",HR:"CROAZIA",SLO:"SLOVENIA",BG:"BULGARIA",IRL:"IRLANDA",L:"LUSSEMBURGO",S:"SVEZIA",FIN:"FINLANDIA",DK:"DANIMARCA",N:"NORVEGIA"};
 function adatta(p){var q={};for(var k in p)q[k]=p[k];q.dubbi=(p.dubbi||[]).slice();
+ if(VEI[q.cittadinanza]&&!/^[A-Z]{3}$/.test(q.cittadinanza)||(q.cittadinanza==="USA"||q.cittadinanza==="IRL"||q.cittadinanza==="SLO"||q.cittadinanza==="FIN"))q.cittadinanza=VEI[q.cittadinanza]||q.cittadinanza;
  if(/^[A-Z]{3}$/.test(q.cittadinanza||"")&&MRZ.PAESI[q.cittadinanza])q.cittadinanza=MRZ.PAESI[q.cittadinanza];
  if(!q.stato_nascita&&!q.comune_nascita&&q.luogo_nascita){var c=trova(TAB.comuni,q.luogo_nascita);
   if(c){q.comune_nascita=q.luogo_nascita;q.provincia_nascita=q.provincia_nascita||c.p;q.stato_nascita="ITALIA"}
