@@ -306,5 +306,12 @@ console.log(n + " prove superate");
   const mg = S.migliora(px, m.w, m.h); assert.ok(mg[c0] >= 240, "«Migliora» rende bianco il fondo");
   // foto senza bordi (documento che riempie tutta la foto): non inventa angoli
   const pieno = new Uint8Array(w * h * 4).fill(235); assert.equal(S.angoli(S.grigio(pieno, w, h), w, h, pieno), null);
-  console.log("ok  scanner: angoli di sbieco, raddrizza, migliora, niente angoli inventati");
+  // qualità: nitida vs sfocata (sfocatura forte fatta qui), senza bordi = segnalato
+  const g0 = S.grigio(rgba, w, h), q0 = S.qualita(g0, w, h, r);
+  let gb = Uint8Array.from(g0); for (let k = 0; k < 6; k++) { const o = new Uint8Array(w * h); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let t = 0, n = 0; for (let d = -3; d <= 3; d++) { const X = Math.min(w - 1, Math.max(0, x + d)); t += gb[y * w + X]; n++; } o[y * w + x] = t / n; } const o2 = new Uint8Array(w * h); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let t = 0, n = 0; for (let d = -3; d <= 3; d++) { const Y = Math.min(h - 1, Math.max(0, y + d)); t += o[Y * w + x]; n++; } o2[y * w + x] = t / n; } gb = o2; }
+  const q1 = S.qualita(gb, w, h, r), q2 = S.qualita(g0, w, h, null);
+  assert.ok(q0.voto >= 80 && !q0.problemi.some((t) => /sfocat/.test(t)), "foto nitida: buona (" + q0.voto + ")");
+  assert.ok(q1.voto < q0.voto && q1.problemi.some((t) => /sfocat/.test(t)), "foto sfocata segnalata (" + q1.voto + ")");
+  assert.ok(q2.problemi.some((t) => /bordi/.test(t)), "bordi non trovati segnalati");
+  console.log("ok  scanner: angoli di sbieco, raddrizza, migliora, qualità della foto, niente angoli inventati");
 })();

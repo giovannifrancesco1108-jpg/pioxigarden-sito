@@ -254,6 +254,25 @@ function migliora(rgba, w, h) {
   return o;
 }
 
-root.SCAN = { grigio: grigio, ritaglio: ritaglio, inclinazione: inclinazione, normalizza: normalizza, angoli: angoli, omografia: omografia, misure: misure, raddrizza: raddrizza, migliora: migliora };
+/* Qualità della foto (prima di fidarsi): nitidezza (varianza del laplaciano), luce, riflessi, documento troppo piccolo o tagliato.
+   Dà un punteggio 0–100 e i problemi in parole semplici; non scarta nulla da solo. */
+function qualita(g, w, h, ang) {
+  var R = riduci(g, w, h, 900), W = R.w, H = R.h, a = R.g, x, y, i, n = 0, s = 0, s2 = 0, somma = 0, bruciati = 0, P = [];
+  for (y = 1; y < H - 1; y++) for (x = 1; x < W - 1; x++) { i = y * W + x; var L = 4 * a[i] - a[i - 1] - a[i + 1] - a[i - W] - a[i + W]; s += L; s2 += L * L; n++; }
+  for (i = 0; i < a.length; i++) { somma += a[i]; if (a[i] >= 250) bruciati++; }
+  var nit = s2 / n - (s / n) * (s / n), luce = somma / a.length, rifl = bruciati / a.length, voto = 100;
+  if (nit < 25) { voto -= 45; P.push("la foto è sfocata: rifalla tenendo fermo il telefono"); } else if (nit < 60) { voto -= 20; P.push("la foto è un po' sfocata"); }
+  if (luce < 60) { voto -= 30; P.push("c'è poca luce"); } else if (luce > 235) { voto -= 15; P.push("la foto è troppo chiara"); }
+  if (rifl > 0.06) { voto -= 25; P.push("ci sono riflessi forti: inclina un po' il documento o spegni il flash"); }
+  if (!ang) { voto -= 15; P.push("non vedo bene i bordi del documento: se serve, sistemali tu"); }
+  else {
+    if (ang.area < 0.2) { voto -= 15; P.push("il documento è piccolo nella foto: avvicinati"); }
+    var bordo = ang.punti.filter(function (p) { return p[0] <= 2 || p[1] <= 2 || p[0] >= w - 3 || p[1] >= h - 3; }).length;
+    if (bordo >= 2) { voto -= 10; P.push("il documento tocca il bordo della foto: forse è tagliato"); }
+  }
+  return { voto: Math.max(0, voto), nitidezza: Math.round(nit), luce: Math.round(luce), riflessi: Math.round(rifl * 1000) / 10, problemi: P };
+}
+
+root.SCAN = { qualita: qualita, grigio: grigio, ritaglio: ritaglio, inclinazione: inclinazione, normalizza: normalizza, angoli: angoli, omografia: omografia, misure: misure, raddrizza: raddrizza, migliora: migliora };
 if (typeof module !== "undefined" && module.exports) module.exports = root.SCAN;
 })(typeof window !== "undefined" ? window : globalThis);
