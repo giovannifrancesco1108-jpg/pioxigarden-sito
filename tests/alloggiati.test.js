@@ -254,3 +254,64 @@ console.log(n + " prove superate");
   assert.equal(c.comune_nascita, "SAN SEVERO"); assert.equal(c.provincia_nascita, "FG");
   console.log("ok  testo copiato dal telefono: etichette spezzate, «COGNOME / SUR», righe ripetute, date di emissione");
 })();
+
+// ---- RAGIONATORE: messaggi, elenchi, più lingue (dati INVENTATI) ----
+(function () {
+  const L = (t) => INC.leggi(t).persone;
+  let p = L("Buongiorno, sono Giulia Ferretti, nata a Velletri (RM) il 12 marzo 1985. Carta d'identità CA12345AB. Grazie!")[0];
+  assert.equal(p.cognome, "FERRETTI"); assert.equal(p.nome, "GIULIA"); assert.equal(p.sesso, "F"); assert.equal(p.data_nascita, "12/03/1985");
+  assert.equal(p.comune_nascita, "VELLETRI"); assert.equal(p.provincia_nascita, "RM"); assert.equal(p.numero_documento, "CA12345AB"); assert.equal(p.tipo_documento, "IDELE");
+  assert.ok(p.perche && p.perche.sesso, "spiega perché");
+  p = L("Hello, my name is John Smith, I was born in Leeds on March 3, 1979. I'm British, male. My passport number is AB1234567. Thanks!")[0];
+  assert.equal(p.cognome, "SMITH"); assert.equal(p.nome, "JOHN"); assert.equal(p.data_nascita, "03/03/1979"); assert.equal(p.cittadinanza, "GBR"); assert.equal(p.numero_documento, "AB1234567"); assert.equal(p.tipo_documento, "PASOR");
+  p = L("Bonjour, je m'appelle Camille DUPONT, née le 4 juillet 1990 à Lyon. Nationalité française, carte d'identité n° AB12C3D45.")[0];
+  assert.equal(p.cognome, "DUPONT"); assert.equal(p.nome, "CAMILLE"); assert.equal(p.sesso, "F"); assert.equal(p.data_nascita, "04/07/1990"); assert.equal(p.cittadinanza, "FRA");
+  p = L("Hallo, mein Name ist Lena Fischer, geboren am 2. März 1988 in Hamburg. Staatsangehörigkeit: deutsch. Reisepass Nr. C01X00T47")[0];
+  assert.equal(p.cognome, "FISCHER"); assert.equal(p.data_nascita, "02/03/1988"); assert.equal(p.cittadinanza, "DEU");
+  // elenco senza etichette e riga con virgole
+  p = L("ROSSI\nMARIO\nM\n03/04/1980\nITA\nCA98765ZZ\nANZIO (RM)")[0];
+  assert.equal(p.cognome, "ROSSI"); assert.equal(p.nome, "MARIO"); assert.equal(p.comune_nascita, "ANZIO");
+  p = L("DE ROSA, CHIARA, F, 07/07/1991, LATINA LT, italiana, CB11111AA")[0];
+  assert.equal(p.cognome, "DE ROSA"); assert.equal(p.nome, "CHIARA"); assert.equal(p.comune_nascita, "LATINA");
+  // la data più vecchia è la nascita, le altre sono arrivo/scadenza
+  p = L("Arriviamo il 14/12/2026. Sono Paolo Neri, nato il 01/02/1975, passaporto YA1234567 scadenza 05/05/2031")[0];
+  assert.equal(p.data_nascita, "01/02/1975");
+  // due persone nello stesso messaggio
+  const due = L("Ciao! Siamo in due:\nBianchi Marco nato a Frascati (RM) il 3/2/1984, carta d'identità CA11223BB\nRossi Elena nata a Velletri il 12 marzo 1987, CI CB44556CC");
+  assert.equal(due.length, 2); assert.equal(due[0].cognome, "BIANCHI"); assert.equal(due[1].nome, "ELENA"); assert.equal(due[1].sesso, "F");
+  // il sesso indovinato dal nome è sempre da controllare
+  p = L("VERDI\nANNA\n09/09/1999\nITA\nCA22334DD")[0];
+  assert.equal(p.sesso, "F"); assert.ok(p.dubbi.indexOf("sesso") >= 0);
+  console.log("ok  ragionatore: messaggi IT/EN/FR/DE, elenchi, date, più persone, perché e dubbi");
+})();
+
+// ---- SCANNER «come le app»: angoli di un documento fotografato di sbieco, raddrizzamento (immagine SINTETICA) ----
+(function () {
+  require("../admin/alloggiati/scanner.js"); const S = globalThis.SCAN;
+  const w = 900, h = 1200, rgba = new Uint8Array(w * h * 4), Q = [[140, 300], [780, 340], [820, 820], [110, 760]];
+  const dentro = (x, y) => { let s = 0; for (let i = 0; i < 4; i++) { const a = Q[i], b = Q[(i + 1) % 4], c = (b[0] - a[0]) * (y - a[1]) - (b[1] - a[1]) * (x - a[0]); if (c < 0) return false; } return true; };
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = (y * w + x) * 4, riga = (y + Math.round(x / 7)) % 23 < 5; // tavolo con le venature
+    let c = dentro(x, y) ? [232, 238, 245] : riga ? [125, 85, 50] : [150, 105, 65];
+    if (dentro(x, y) && y % 40 < 6 && x % 90 < 60 && x > 200 && x < 700) c = [40, 40, 50]; // «testo»
+    rgba[i] = c[0]; rgba[i + 1] = c[1]; rgba[i + 2] = c[2]; rgba[i + 3] = 255;
+  }
+  const r = S.angoli(S.grigio(rgba, w, h), w, h, rgba);
+  assert.ok(r, "trova il documento");
+  const err = Math.max(...Q.map((q, i) => Math.hypot(q[0] - r.punti[i][0], q[1] - r.punti[i][1])));
+  assert.ok(err < 12, "angoli precisi (errore " + err.toFixed(1) + " px)");
+  const m = S.misure(r.punti, 800), px = S.raddrizza(rgba, w, h, r.punti, m.w, m.h);
+  assert.ok(m.w > m.h && px.length === m.w * m.h * 4, "documento orizzontale raddrizzato");
+  const c0 = (Math.round(m.h / 2) * m.w + 10) * 4; assert.ok(px[c0] > 200, "dentro il raddrizzato c'è il documento, non il tavolo");
+  const mg = S.migliora(px, m.w, m.h); assert.ok(mg[c0] >= 240, "«Migliora» rende bianco il fondo");
+  // foto senza bordi (documento che riempie tutta la foto): non inventa angoli
+  const pieno = new Uint8Array(w * h * 4).fill(235); assert.equal(S.angoli(S.grigio(pieno, w, h), w, h, pieno), null);
+  // qualità: nitida vs sfocata (sfocatura forte fatta qui), senza bordi = segnalato
+  const g0 = S.grigio(rgba, w, h), q0 = S.qualita(g0, w, h, r);
+  let gb = Uint8Array.from(g0); for (let k = 0; k < 6; k++) { const o = new Uint8Array(w * h); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let t = 0, n = 0; for (let d = -3; d <= 3; d++) { const X = Math.min(w - 1, Math.max(0, x + d)); t += gb[y * w + X]; n++; } o[y * w + x] = t / n; } const o2 = new Uint8Array(w * h); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let t = 0, n = 0; for (let d = -3; d <= 3; d++) { const Y = Math.min(h - 1, Math.max(0, y + d)); t += o[Y * w + x]; n++; } o2[y * w + x] = t / n; } gb = o2; }
+  const q1 = S.qualita(gb, w, h, r), q2 = S.qualita(g0, w, h, null);
+  assert.ok(q0.voto >= 80 && !q0.problemi.some((t) => /sfocat/.test(t)), "foto nitida: buona (" + q0.voto + ")");
+  assert.ok(q1.voto < q0.voto && q1.problemi.some((t) => /sfocat/.test(t)), "foto sfocata segnalata (" + q1.voto + ")");
+  assert.ok(q2.problemi.some((t) => /bordi/.test(t)), "bordi non trovati segnalati");
+  console.log("ok  scanner: angoli di sbieco, raddrizza, migliora, qualità della foto, niente angoli inventati");
+})();

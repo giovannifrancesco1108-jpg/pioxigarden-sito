@@ -517,13 +517,25 @@ function raggruppa(P) {
 /* riprova da sola: se la prima lettura lascia buchi, rilegge con la lettura larga e tiene la migliore */
 function riempiti(r) { var n = 0; r.persone.forEach(function (p) { ["cognome", "nome", "data_nascita", "sesso", "cittadinanza", "numero_documento"].forEach(function (k) { if (p[k]) n++; }); n += r.persone.length * 0.01; }); return n; }
 function leggi(testo, opz) {
-  var a = leggi1(testo, opz);
-  if (opz && opz.largo) return a;
+  opz = opz || {};
+  var fine = function (x) { // il ragionatore per ultimo: riempie i buchi e spiega
+    if (opz.senzaRagiona) return x;
+    var tt = String(testo || ""), piu = x.persone.length <= 1 ? ragionaTutti(tt, opz) : null;
+    if (piu && (discorsivoDi(tt) || !x.persone.length || !x.persone[0].cognome)) {
+      x.persone = piu.map(function (r) { return conRagiona([], r.testo, opz)[0]; }).filter(Boolean);
+      x.note = (x.note || []).concat(["Nel messaggio ci sono " + x.persone.length + " persone: le ho lette una per riga."]);
+      return x;
+    }
+    x.persone = conRagiona(x.persone, tt, opz); return x;
+  };
+  var o1 = {}; Object.keys(opz).forEach(function (k) { o1[k] = opz[k]; }); o1.senzaRagiona = true;
+  var a = leggi1(testo, o1);
+  if (opz.largo) return fine(a);
   var buchi = a.persone.some(function (p) { return !p.cognome || !p.nome || !p.data_nascita || !p.sesso || (!p.cittadinanza && !p.mrz); });
-  if (!buchi && a.persone.length) return a;
-  var b = leggi1(testo, { largo: true });
-  if (b.persone.length === a.persone.length && riempiti(b) > riempiti(a)) { b.note = (b.note || []).concat(["Ho riprovato con la lettura più larga."]); return b; }
-  return a;
+  if (!buchi && a.persone.length) return fine(a);
+  var b = leggi1(testo, { largo: true, senzaRagiona: true });
+  if (b.persone.length === a.persone.length && riempiti(b) > riempiti(a)) { b.note = (b.note || []).concat(["Ho riprovato con la lettura più larga."]); return fine(b); }
+  return fine(a);
 }
 function leggi1(testo, opz) {
   OPZ = opz || {};
@@ -562,6 +574,7 @@ function leggi1(testo, opz) {
     if (p.rilascio_testo && !p.rilascio_comune && !p.rilascio_stato) { var rt = norm(p.rilascio_testo); if (/^[A-Z]{3}$/.test(rt) && MRZ && MRZ.PAESI && MRZ.PAESI[rt]) p.rilascio_stato = MRZ.PAESI[rt]; else if (/\bMIT\b|\bUCO\b|MOTORIZZAZIONE/.test(rt)) p.rilascio_comune = "ROMA"; }
     if (!p.rilascio_comune && !p.rilascio_stato && p.tipo_documento === "PASOR" && /^[A-Z]{3}$/.test(p.cittadinanza || "") && p.cittadinanza !== "ITA" && MRZ && MRZ.PAESI && MRZ.PAESI[p.cittadinanza]) { p.rilascio_stato = MRZ.PAESI[p.cittadinanza]; (p.euristico = p.euristico || []).push("rilascio"); } // il passaporto lo rilascia il paese di cui si è cittadini: da controllare
   });
+  if (!OPZ.senzaRagiona) P = conRagiona(P, t, OPZ);
   P.forEach(function (p) { if (p.tipo_documento === "PATEN" && p.rilascio_testo && !p.rilascio_comune) { var mc = /\b(?:U?MC|M\.?C\.?)\s*[-–]?\s*([A-Z]{2})\b/.exec(norm(p.rilascio_testo)); if (mc && CAPOLUOGO[mc[1]]) p.rilascio_comune = CAPOLUOGO[mc[1]]; } });
   P.forEach(function (p) {
     p.dubbi = [].concat(p.differenze || []).map(function (d) { return { "data di nascita": "data_nascita", "numero del documento": "numero_documento" }[d] || d; });
@@ -951,6 +964,256 @@ function uniscianc(q, an) {
   if (an.paese_doc === "ITA" && /^C[A-Z]\d{5}[A-Z]{2}$/.test(q.numero_documento || "") && (!q.tipo_documento || q.tipo_documento === "IDENT")) q.tipo_documento = "IDELE";
 }
 
-var api = { _na: function (v) { return [nomeAncora(v), sembraEtichetta(v), pulisciValore(v)]; }, _ar: function (r) { return ancoreRiga(tokRiga(r)); }, _spaz: function (r) { return riga_spazzatura(r); }, ancore: ancore, paeseDoc: paeseDoc, codicePaese: codicePaese, CAPOLUOGO: CAPOLUOGO, unisci: unisci, leggi1: leggi1, riempiti: riempiti, largo: largo, ripara: ripara, euristica: euristica, dividi: dividi, correggiNumero: correggiNumero, blocchi: blocchi, raggruppa: raggruppa, mrzTutte: mrzTutte, cfValido: cfValido, cfControlla: cfControlla, leggi: leggi, persone: persone, confronta: confronta, dataNorm: dataNorm, tipoDocDa: tipoDocDa, sessoDa: sessoDa };
+/* ======================== RAGIONATORE ========================
+   Legge un testo qualsiasi (documento copiato, messaggio WhatsApp, email, elenco senza etichette) come farebbe una persona:
+   1) raccoglie da TUTTO il testo i candidati di ogni campo: date (anche «12 marzo 1985», «March 12, 1985», «12. März 1985»),
+      frasi («nata a Roma il…», «born in Leeds on…», «né le… à…», «mi chiamo…», «carta d'identità n.…»), forme
+      («CITTÀ (PR)», numeri di documento, M/F, codici di paese, aggettivi di nazionalità in 6 lingue);
+   2) distingue nome e cognome con un dizionario di nomi propri (con il sesso), le particelle (DE, DI, LO, VAN…),
+      il maiuscolo («Marie DUPONT»), la virgola («Smith, John») e l'ordine tipico di ogni tipo di testo;
+   3) verifica i candidati tra loro: la data di nascita è la più vecchia plausibile (le altre sono emissione e scadenza),
+      il codice fiscale conferma cognome, nome, data e sesso e decide l'ordine quando è dubbio;
+   4) per ogni campo dice PERCHÉ ha scelto quel valore e quanto è sicuro («frase», «etichetta», «forma», «deduzione»).
+   I valori dedotti (sesso dal nome, ordine nome/cognome indovinato) vanno sempre controllati. */
+var NOMI_M = "ADAM ADRIANO ALBERTO ALDO ALESSANDRO ALESSIO ALEX ALEXANDER ALFREDO ALI ALAIN ANDREA ANDREI ANDREW ANDRES ANGELO ANTOINE ANTONIO ARTURO AURELIO BENEDETTO BENJAMIN BERNARD BIAGIO BRUNO CARLO CARLOS CESARE CHARLES CHRISTIAN CHRISTOPHER CIARAN CLAUDIO CORRADO CRISTIAN CRISTIANO DANIEL DANIELE DANILO DARIO DAVID DAVIDE DENIS DIEGO DIMITRI DMYTRO DOMENICO DONATO EDOARDO EDWARD ELIA EMANUELE EMILIO EMRE ENEA ENRICO ENZO ERIK ERNESTO ETHAN EUGENIO FABIO FABRIZIO FEDERICO FELICE FERDINANDO FILIPPO FLORIAN FRANCESCO FRANCO FRANCOIS FRANK GABRIELE GAETANO GENNARO GEORGE GERARDO GIACOMO GIAN GIANCARLO GIANFRANCO GIANLUCA GIANMARCO GIANNI GIORGIO GIORGOS GIOVANNI GIULIO GIUSEPPE GREGORIO GUIDO HANS HARRY HENRI HIROSHI HUGO IGNAZIO IVAN JACK JACOPO JAMES JAN JAVIER JEAN JOAO JOHN JORGE JOSE JOSEPH JUAN JURGEN KARL KEVIN LARS LASZLO LAURENT LEONARDO LIAM LORENZO LUC LUCA LUCAS LUCIANO LUDOVICO LUIGI LUIS LUKA LUKAS MAGNUS MANUEL MARCELLO MARCO MARIO MARK MARTIN MASSIMO MATEO MATTEO MATTIA MAURIZIO MAX MEHMET MICHAEL MICHELE MIGUEL MIHAI MOHAMED NICOLA NICOLAS NICOLO NIKOLAOS NORBERTO OLE OLEKSANDR OLIVER OSCAR PABLO PAOLO PASQUALE PATRICK PAUL PAWEL PEDRO PETER PIER PIERGIORGIO PIERO PIERRE PIETRO PIOTR RAFFAELE RAHUL RENATO RENZO RICCARDO ROBERTO ROCCO ROMANO SALVATORE SAMUELE SANDRO SANTIAGO SEAN SEBASTIAN SEBASTIANO SEM SERGIO SILVIO SIMONE STEFANO TAKUMI TIAGO TOMAS TOMMASO THOMAS UMBERTO URS VALERIO VINCENZO VITTORIO WALTER WEI WILLIAM XIAOMING YOUSSEF DAAN PIETER ARBEN ARJUN BENCE ALEXANDRE GUILLAUME JULIEN MAXIME NICCOLO OTTAVIO OSVALDO REMO".split(" ");
+var NOMI_F = "ADA ADRIANA AGNESE ALBA ALESSANDRA ALESSIA ALICE ALINE AMANDA ANA ANNA ANNALISA ANANYA ANGELA ANNE ANNIE ANTONELLA ARIANNA ASIA ASTRID AURORA BARBARA BEATRICE BEATRIZ BIANCA CAMILLA CAMILLE CARLA CARMEN CAROLINA CATERINA CECILIA CHARLOTTE CHIARA CHLOE CINZIA CLAIRE CLARA CLAUDIA CRISTINA DANIELA DEBORA DONATELLA ELENA ELENI ELEONORA ELISA ELISABETTA ELIF ELKE ELONA EMILY EMMA ERICA FANG FATIMA FEDERICA FLAVIA FLEUR FRANCESCA GABRIELLA GIADA GIOVANNA GIORGIA GIULIA GIUSEPPINA GRAZIA HANNAH ILARIA INGRID IOANA IRENE IRYNA ISABELLA ISABELLE JANA JENNIFER JULIA KARIN KATARZYNA KATHARINA LARA LAURA LEA LENA LETIZIA LI LINDA LORENA LORENZA LUCIA LUCIE LUDOVICA LUISA MANUELA MARA MARGHERITA MARIA MARIANNA MARIANA MARIE MARINA MARTA MARTINA MARY MATILDE MELISSA MICHELA MIRIAM MONICA NADIA NATALIA NIAMH NICOLE NINA NOEMI NORA OLENA OLIVIA OMBRETTA PAOLA PATRIZIA PETRA PRIYA RAFFAELLA REBECCA REKA RITA ROBERTA ROSA ROSSELLA SABRINA SAKURA SALMA SANNE SARA SARAH SERENA SILVIA SIMONA SIOBHAN SOFIA SONIA SOPHIE STEFANIA SUSANNA TERESA TIZIANA VALENTINA VALERIA VANESSA VERONICA VIOLA VITTORIA YUKI ZEYNEP ZUZANA AOIFE CLAIRE ELLEN LOUISE MONIQUE TRACY ALEXANDRA ELEANOR ELISABETH GEORGETTE DOMINIQUE".split(" ");
+var GENERE = {}; NOMI_M.forEach(function (n) { GENERE[n] = "M"; }); NOMI_F.forEach(function (n) { GENERE[n] = GENERE[n] ? "X" : "F"; });
+["ANDREA", "SIMONE", "NICOLA", "LUCA", "GABRIELE", "MICHELE", "DANIELE"].forEach(function (n) { GENERE[n] = "M"; }); // in Italia sono nomi maschili
+var PART = /^(DE|DI|DA|DEL|DELLA|DELLE|DEGLI|DEI|DELL'?|D'|LO|LA|LE|LI|VAN|VON|DER|DEN|TEN|TER|MAC|MC|O'|AL|EL|BEN|BIN|DOS|DAS|DU|DES|ST|SAN|SANTA)$/;
+var NAZ_AGG = { ITALIANA: "ITA", ITALIANO: "ITA", ITALIAN: "ITA", ITALIENNE: "ITA", ITALIEN: "ITA", ITALIENISCH: "ITA", BRITISH: "GBR", ENGLISH: "GBR", BRITANNICA: "GBR", BRITANNICO: "GBR", IRISH: "IRL", IRLANDESE: "IRL", AMERICAN: "USA", STATUNITENSE: "USA", AMERICANA: "USA", AMERICANO: "USA", CANADIAN: "CAN", CANADESE: "CAN", AUSTRALIAN: "AUS", AUSTRALIANA: "AUS", AUSTRALIANO: "AUS", FRENCH: "FRA", FRANCAISE: "FRA", FRANCAIS: "FRA", FRANCESE: "FRA", SPANISH: "ESP", ESPANOLA: "ESP", ESPANOL: "ESP", SPAGNOLA: "ESP", SPAGNOLO: "ESP", GERMAN: "DEU", DEUTSCH: "DEU", DEUTSCHE: "DEU", TEDESCA: "DEU", TEDESCO: "DEU", AUSTRIAN: "AUT", AUSTRIACA: "AUT", AUSTRIACO: "AUT", SWISS: "CHE", SVIZZERA: "CHE", SVIZZERO: "CHE", DUTCH: "NLD", OLANDESE: "NLD", BELGIAN: "BEL", BELGA: "BEL", PORTUGUESE: "PRT", PORTUGUESA: "PRT", PORTOGHESE: "PRT", POLISH: "POL", POLACCA: "POL", POLACCO: "POL", ROMANIAN: "ROU", RUMENA: "ROU", RUMENO: "ROU", ROMENA: "ROU", ROMENO: "ROU", GREEK: "GRC", GRECA: "GRC", GRECO: "GRC", BRAZILIAN: "BRA", BRASILIANA: "BRA", BRASILIANO: "BRA", ARGENTINE: "ARG", ARGENTINIAN: "ARG", ARGENTINA: "ARG", ARGENTINO: "ARG", CHINESE: "CHN", CINESE: "CHN", JAPANESE: "JPN", GIAPPONESE: "JPN", INDIAN: "IND", INDIANA: "IND", INDIANO: "IND", MOROCCAN: "MAR", MAROCCHINA: "MAR", MAROCCHINO: "MAR", TURKISH: "TUR", TURCA: "TUR", TURCO: "TUR", UKRAINIAN: "UKR", UCRAINA: "UKR", UCRAINO: "UKR", ALBANIAN: "ALB", ALBANESE: "ALB", RUSSIAN: "RUS", RUSSA: "RUS", RUSSO: "RUS", SWEDISH: "SWE", SVEDESE: "SWE", NORWEGIAN: "NOR", NORVEGESE: "NOR", DANISH: "DNK", DANESE: "DNK", FINNISH: "FIN", HUNGARIAN: "HUN", UNGHERESE: "HUN", CZECH: "CZE", CECA: "CZE", CECO: "CZE", SLOVAK: "SVK", CROATIAN: "HRV", CROATA: "HRV", MEXICAN: "MEX", MESSICANA: "MEX", MESSICANO: "MEX" };
+var MESI_L = { GENNAIO: 1, FEBBRAIO: 2, MARZO: 3, APRILE: 4, MAGGIO: 5, GIUGNO: 6, LUGLIO: 7, AGOSTO: 8, SETTEMBRE: 9, OTTOBRE: 10, NOVEMBRE: 11, DICEMBRE: 12,
+  JANUARY: 1, FEBRUARY: 2, MARCH: 3, APRIL: 4, MAY: 5, JUNE: 6, JULY: 7, AUGUST: 8, SEPTEMBER: 9, OCTOBER: 10, NOVEMBER: 11, DECEMBER: 12,
+  JANVIER: 1, FEVRIER: 2, MARS: 3, AVRIL: 4, MAI: 5, JUIN: 6, JUILLET: 7, AOUT: 8, SEPTEMBRE: 9, OCTOBRE: 10, DECEMBRE: 12,
+  ENERO: 1, FEBRERO: 2, ABRIL: 4, MAYO: 5, JUNIO: 6, JULIO: 7, SEPTIEMBRE: 9, OCTUBRE: 10, NOVIEMBRE: 11, DICIEMBRE: 12,
+  JANUAR: 1, FEBRUAR: 2, MARZ: 3, JUNI: 6, JULI: 7, OKTOBER: 10, DEZEMBER: 12, JANEIRO: 1, FEVEREIRO: 2, MARCO: 3, MAIO: 5, JUNHO: 6, JULHO: 7, SETEMBRO: 9, OUTUBRO: 10, NOVEMBRO: 11, DEZEMBRO: 12 };
+Object.keys(MESI).forEach(function (k) { MESI_L[k.toUpperCase()] = MESI[k]; });
+var NON_NOMI = /^(SONO|MI|CHIAMO|MY|NAME|IS|I|AM|IM|HELLO|HI|CIAO|BUONGIORNO|BUONASERA|SALVE|GRAZIE|THANKS|THANK|YOU|BONJOUR|HOLA|HALLO|ECCO|MIEI|DATI|DETAILS|HERE|ARE|THE|FOR|CHECK|IN|PER|IL|LA|LE|UN|UNA|E|ED|AND|DI|DA|A|NATO|NATA|BORN|ON|NE|NEE|NACIDO|NACIDA|GEBOREN|AM|EN|EL|DE|DEL|ME|LLAMO|JE|APPELLE|MEIN|IST|ICH|BIN|HEISSE|FULL|COGNOME|NOME|CARTA|PASSAPORTO|PASSPORT|DOCUMENTO|NUMERO|NUMBER|NR|NO|N|IDENTITA|IDENTITY|NATIONALITY|NAZIONALITA|CITTADINANZA|SEX|SESSO|MALE|FEMALE|MASCHIO|FEMMINA|SIG|SIGRA|SIGNOR|SIGNORA|MR|MRS|MS|MISS|DOTT|DR|ARRIVO|ARRIVIAMO|ARRIVAL|NOTTI|NIGHTS|OSPITE|OSPITI|GUEST|SIAMO|WE|PRENOTAZIONE|BOOKING|RESIDENTE|RESIDENZA|VIA|PIAZZA|CORSO|TEL|TELEFONO|EMAIL|MAIL|CF|CODICE|FISCALE|TESSERA|SANITARIA|DNI|RILASCIATA|RILASCIATO|COMUNE|LUOGO|DATA|NASCITA|PROVINCIA|ITALIA|ITALY|REPUBBLICA|ITALIANA|ITALIANO|DOCUMENT|DOCUMENTS|ID|CARD|NATIONALITE|NACIONALIDAD|STAATSANGEHORIGKEIT|REISEPASS|CARTE|IDENTITE|DATE|PLACE|BIRTH|OF|TO|AT|WITH|CON|THANKYOU|SALUTI|CORDIALI|REGARDS|BEST|MERCI|GRACIAS|DANKE|SVP|PLEASE|PREGO|OK|SI|YES|PROVINCE|ORE|ALLE|CHE|POI|ANCHE|ALSO|WIFE|HUSBAND|MOGLIE|MARITO|FIGLIO|FIGLIA|SON|DAUGHTER|WAS|WERE|BEEN|HAVE|HAS|MY|OUR|NOSTRI|NOSTRO|HO|HA|ABBIAMO|STATO|STATA|J'AI|SUIS|ES|EST|IST|BIN|WIR|SIND|MEINE|ESTOY|TENGO)$/;
+
+function annoPieno(a, nascita) { a = +a; if (a >= 100) return a; var y = new Date().getFullYear() % 100; return a > y ? 1900 + a : 2000 + a; }
+function dataVera(g, m, a) { var d = new Date(a, m - 1, g); return d.getFullYear() === a && d.getMonth() === m - 1 && d.getDate() === g; }
+/* tutte le date del testo, con il pezzo di testo che le precede (serve a capire che data è) */
+function dateNelTesto(t) {
+  var s = sa(t), S = s.toUpperCase(), out = [], m, re;
+  var push = function (g, me, a, i, l) { g = +g; me = +me; a = annoPieno(a); if (!me || !dataVera(g, me, a)) return; if (out.some(function (o) { return Math.abs(o.i - i) < 3; })) return; out.push({ d: p2_(g) + "/" + p2_(me) + "/" + a, ord: a * 10000 + me * 100 + g, a: a, i: i, f: i + l, prima: S.slice(Math.max(0, i - 40), i), dopo: S.slice(i + l, i + l + 25) }); };
+  re = /\b(\d{4})[-.\/](\d{1,2})[-.\/](\d{1,2})\b/g; while ((m = re.exec(S))) push(m[3], m[2], m[1], m.index, m[0].length);
+  re = /\b(\d{1,2})\s*[.\/\-]\s*(\d{1,2})\s*[.\/\-]\s*(\d{4}|\d{2})\b/g; while ((m = re.exec(S))) push(m[1], m[2], m[3], m.index, m[0].length);
+  re = /\b(\d{1,2})\s+(\d{1,2})\s+(\d{4})\b/g; while ((m = re.exec(S))) push(m[1], m[2], m[3], m.index, m[0].length);
+  re = /\b(\d{1,2})(?:ST|ND|RD|TH|°|º)?\.?\s*(?:DE\s+)?([A-Z]{3,10})\.?\s*(?:\/\s*[A-Z]{3,5}\s*)?(?:DE\s+|,\s*)?(\d{4}|\d{2})\b/g;
+  while ((m = re.exec(S))) { var me = MESI_L[m[2]] || MESI_L[m[2].slice(0, 3)]; if (me) push(m[1], me, m[3], m.index, m[0].length); }
+  re = /\b([A-Z]{3,10})\.?\s+(\d{1,2})(?:ST|ND|RD|TH)?,?\s+(\d{4})\b/g; while ((m = re.exec(S))) { var me2 = MESI_L[m[1]] || MESI_L[m[1].slice(0, 3)]; if (me2) push(m[2], me2, m[3], m.index, m[0].length); }
+  return out.sort(function (a, b) { return a.i - b.i; });
+}
+function p2_(n) { return String(n).padStart(2, "0"); }
+var RE_NASC = /(NAT[OAIE]|NASCITA|BORN|BIRTH|D\.?O\.?B|NE[E]?\s+LE|NAISS|NACID[OA]|NACIMIENTO|GEBOREN|GEBURT|NASCIMENTO|NASCID[OA]|URODZ|NAROD)/;
+var RE_ALTRE = /(EMISSIONE|EMESS|RILASC|SCADENZA|SCADE|VALID|EXPIR|ISSUE|ISSUED|DELIVR|EXPEDIC|CADUC|GULTIG|AUSSTELL|ARRIV|PARTENZ|CHECK|DAL\s|AL\s|FINO|UNTIL|FROM|DEPART|LEAV|PRENOT|BOOK)/;
+function sceltaNascita(D) { // la data di nascita: quella detta «nato il…», altrimenti la più vecchia plausibile
+  var oggi = new Date(), ok = D.filter(function (d) { var anni = oggi.getFullYear() - d.a; return anni >= 0 && anni <= 110 && d.ord <= oggi.getFullYear() * 10000 + (oggi.getMonth() + 1) * 100 + oggi.getDate(); });
+  var det = ok.filter(function (d) { var pr = d.prima.slice(-28); return RE_NASC.test(pr) && !RE_ALTRE.test(pr.slice(pr.search(RE_NASC))); });
+  if (det.length) return { v: det[0].d, come: "frase", perche: "è la data scritta dopo «" + (RE_NASC.exec(det[0].prima.slice(-28)) || [""])[0].toLowerCase() + "»" };
+  var nonAltre = ok.filter(function (d) { return !RE_ALTRE.test(d.prima.slice(-22)); });
+  var cand = (nonAltre.length ? nonAltre : ok).slice().sort(function (a, b) { return a.ord - b.ord; });
+  if (!cand.length) return null;
+  return { v: cand[0].d, come: ok.length > 1 ? "deduzione" : "forma", perche: ok.length > 1 ? "è la più vecchia delle " + ok.length + " date (le altre sono emissione, scadenza o arrivo)" : "è l'unica data del testo" };
+}
+/* nome e cognome da una sequenza di parole: dove si spezza? */
+function divideNome(parole, indizi) {
+  var w = parole.map(function (x) { return x.toUpperCase(); }), n = w.length; indizi = indizi || {};
+  if (n < 2) return null;
+  var g = function (x) { return GENERE[sa(x).replace(/[^A-Z]/g, "")]; };
+  var best = null;
+  for (var k = 1; k < n; k++) [0, 1].forEach(function (ord) { // ord 0: nome poi cognome; 1: cognome poi nome
+    var A = w.slice(0, k), B = w.slice(k), nomi = ord === 0 ? A : B, cogn = ord === 0 ? B : A;
+    if (PART.test(nomi[nomi.length - 1]) || (ord === 0 && PART.test(A[A.length - 1]))) return; // «DE» sta col cognome che segue
+    if (ord === 1 && PART.test(A[A.length - 1])) return;
+    var sc = 0;
+    nomi.forEach(function (x) { sc += g(x) ? 2 : -1.2; });
+    cogn.forEach(function (x) { sc += PART.test(x) ? 0.6 : g(x) ? -1.6 : 0.8; });
+    if (indizi.maiuscolo) { cogn.forEach(function (x, i) { var o = indizi.orig[ord === 0 ? k + i : i]; if (o && o === o.toUpperCase() && /[A-Z]{2}/.test(o)) sc += 1.5; }); nomi.forEach(function (x, i) { var o = indizi.orig[ord === 0 ? i : k + i]; if (o && o === o.toUpperCase() && /[A-Z]{2}/.test(o)) sc -= 1.5; }); }
+    if (indizi.virgola != null) sc += (ord === 1 && k === indizi.virgola) ? 4 : -2;
+    if (indizi.ordine === ord) sc += 0.7;
+    if (nomi.length > 2) sc -= 1; if (cogn.length > 3) sc -= 1;
+    if (!best || sc > best.sc) best = { sc: sc, nome: nomi.join(" "), cognome: cogn.join(" "), ord: ord, certo: nomi.some(g) && !cogn.some(g) };
+  });
+  return best;
+}
+function provinciaValida(p) { return !!CAPOLUOGO[p]; }
+var STOP_LUOGO = /\s+(?:IL|ON|LE|EL|AM|THE|AND|E|ED|IN DATA|DATA|IN)\s+.*$|\s*[,.;:]\s.*$|\s*\d.*$/;
+function pulisciLuogo(x) { x = sa(x).toUpperCase().replace(/\bIN\s+DATA\b.*$/, "").replace(STOP_LUOGO, "").replace(/[^A-Z' ()\-.]/g, " ").replace(/\s+/g, " ").trim(); var w = x.split(" "); while (w.length && NON_NOMI.test(w[w.length - 1].replace(/[^A-Z]/g, ""))) w.pop(); return w.slice(0, 5).join(" "); }
+
+function discorsivoDi(t) { var parole = String(t || "").split(/\s+/).filter(function (w) { return /^[A-Za-zÀ-ÿ']{2,}$/.test(w); }), minus = parole.filter(function (w) { return /^[a-zà-ÿ']+$/.test(w); }).length; return parole.length >= 6 && minus / parole.length > 0.35; } // un messaggio scritto, non un documento
+function ragiona(testo, opz) {
+  opz = opz || {};
+  var T = String(testo || "").replace(/\r/g, ""), S = sa(T).toUpperCase(), r = { perche: {}, come: {} }, disc = discorsivoDi(T);
+  var metti = function (k, v, come, perche) { if (!v || r[k]) return; r[k] = v; r.come[k] = come; r.perche[k] = perche; };
+  // --- codice fiscale: è la prova più forte per nome, cognome, data e sesso
+  var cfs = (S.match(/\b[A-Z]{6}\d{2}[ABCDEHLMPRST]\d{2}[A-Z]\d{3}[A-Z]\b/g) || []).filter(cfValido);
+  var cf = cfs[0] ? cfDati(cfs[0]) : null; if (cfs[0]) r.codice_fiscale = cfs[0];
+  // --- date
+  var D = dateNelTesto(T), dn = sceltaNascita(D);
+  if (cf) { var a2 = cf.anno2, cand = D.filter(function (d) { return d.d.slice(0, 5) === p2_(cf.giorno) + "/" + p2_(cf.mese) && String(d.a).slice(2) === a2; })[0];
+    var aCF = annoPieno(a2), dCF = p2_(cf.giorno) + "/" + p2_(cf.mese) + "/" + aCF;
+    if (cand) metti("data_nascita", cand.d, "verifica", "coincide con il codice fiscale");
+    else if (!dn || dn.come !== "frase") metti("data_nascita", dCF, "codice fiscale", "ricavata dal codice fiscale " + cfs[0]);
+  }
+  if (dn) metti("data_nascita", dn.v, dn.come, dn.perche);
+  // --- sesso
+  var ms = /\b(NATA|NEE(?=\s+(?:LE|A|EN|\d))|NACIDA|NASCIDA|FEMALE|FEMMINA|FEMME|WEIBLICH|SIGNORA|SIG\.?RA|MRS|MS|MISS)\b/.exec(S), mm = /\b(NATO|NE(?=\s+(?:LE|A|EN|\d))|NACIDO|NASCIDO|MALE|MASCHIO|HOMME|MANNLICH|SIGNOR|SIG|MR)\b/.exec(S);
+  if (cf) metti("sesso", cf.sesso, "codice fiscale", "dal codice fiscale (giorno " + (cf.sesso === "F" ? "+40" : "normale") + ")");
+  var msx = /(?:SESSO|SEX|SEXE|SEXO|GENDER|GESCHLECHT)\s*[:\-]?\s*([MF]|MALE|FEMALE|MASCHIO|FEMMINA|MASCULINO|FEMENINO)\b/.exec(S);
+  if (msx) metti("sesso", /^F/.test(msx[1]) ? "F" : "M", "frase", "scritto «" + msx[0].toLowerCase() + "»");
+  if (!disc) { if (ms && /NAT|NE|NAC|NASC/.test(ms[1])) ms = null; if (mm && /NAT|NE|NAC|NASC/.test(mm[1])) mm = null; } // sul documento «nato il» è stampato per tutti
+  if (ms && !(mm && mm.index < ms.index && /NATO|NACIDO/.test(mm[0]))) metti("sesso", "F", "frase", "il testo dice «" + ms[0].toLowerCase() + "»");
+  if (mm && /^(NATO|NE|NACIDO|NASCIDO|MALE|MASCHIO|HOMME|MANNLICH|MR)$/.test(mm[1])) metti("sesso", "M", "frase", "il testo dice «" + mm[0].toLowerCase() + "»");
+  var lineeMF = T.split("\n").map(function (x) { return x.trim(); }).filter(function (x) { return /^[MF]$/.test(x); }); if (lineeMF.length === 1) metti("sesso", lineeMF[0], "forma", "riga con solo «" + lineeMF[0] + "»");
+  var vMF = /(?:^|,)\s*([MF])\s*(?:,|$)/m.exec(T); if (vMF) metti("sesso", vMF[1], "forma", "«" + vMF[1] + "» tra le virgole");
+  // --- cittadinanza
+  var mc = /(?:CITTADINANZA|NAZIONALITA|NATIONALITY|NATIONALITE|NACIONALIDAD|NACIONALIDADE|STAATSANGEHORIGKEIT|CITIZENSHIP|CITIZEN)\s*[:\-]?\s*([A-Z]{3,20})/.exec(S);
+  var codN = function (w) { w = w.replace(/[^A-Z]/g, ""); return NAZ_AGG[w] || (w.length === 3 && MRZ && MRZ.PAESI && MRZ.PAESI[w] ? w : ""); };
+  if (mc && codN(mc[1])) metti("cittadinanza", codN(mc[1]), "frase", "scritto «" + mc[0].toLowerCase() + "»");
+  if (!r.cittadinanza) { var ma = /\b(?:I'?M|I\s+AM|SONO|SOY|JE\s+SUIS|ICH\s+BIN)\s+(?:A\s+|AN\s+)?([A-Z]{4,14})\b/.exec(S); if (ma && NAZ_AGG[ma[1]]) metti("cittadinanza", NAZ_AGG[ma[1]], "frase", "«" + ma[0].toLowerCase() + "»"); }
+  if (!r.cittadinanza) { var pz = S.split(/[\s,;:\n\/]+/).map(function (w) { return w.replace(/[^A-Z]/g, ""); }); for (var q = 0; q < pz.length; q++) { if (NAZ_AGG[pz[q]] && pz[q].length >= 5) { metti("cittadinanza", NAZ_AGG[pz[q]], "forma", "la parola «" + pz[q].toLowerCase() + "»"); break; } } }
+  if (!r.cittadinanza) { var l3 = T.split(/[\n,;]+/).map(function (x) { return x.trim().toUpperCase(); }).filter(function (x) { return /^[A-Z]{3}$/.test(x) && MRZ && MRZ.PAESI && MRZ.PAESI[x]; }); if (l3.length === 1) metti("cittadinanza", l3[0], "forma", "codice del paese «" + l3[0] + "» da solo"); }
+  // --- documento
+  var tipo = "", mt;
+  if (/CARTA\s+D.?\s*IDENTITA|CARTA\s+IDENTITA|\bC\.?\s?I\.?\s+(?:N|NR|NUM|\d|C[A-Z])|IDENTITY\s+CARD|CARTE\s+D.?\s*IDENTITE|\bDNI\b|PERSONALAUSWEIS|DOCUMENTO\s+NACIONAL/.test(S)) tipo = "IDENT";
+  if (/PASSAPORTO|PASSPORT|PASSEPORT|PASAPORTE|REISEPASS|PASAPORT|PASZPORT/.test(S)) tipo = tipo && /CARTA|CARTE|IDENTITY|DNI/.test(S) && S.search(/PASS/) > S.search(/CARTA|CARTE|IDENTITY|DNI/) ? tipo : "PASOR";
+  if (/PATENTE|DRIVING\s+LICEN|PERMIS\s+DE\s+CONDUIRE|FUHRERSCHEIN|CARNET\s+DE\s+CONDUCIR/.test(S) && !tipo) tipo = "PATEN";
+  var reNum = /(?:CARTA\s+D.?\s*IDENTITA(?:\s+ELETTRONICA)?|CARTA\s+IDENTITA(?:\s+ELETTRONICA)?|\bC\.?\s?I\.?|IDENTITY\s+CARD|CARTE\s+D.?\s*IDENTITE|\bDNI|PASSAPORTO|PASSPORT|PASSEPORT|PASAPORTE|REISEPASS|PATENTE|DOCUMENTO|DOCUMENT|NUMERO|NUMBER)\s*(?:N(?:UMERO|UMBER|R|O)?\.?\s*|N°\s*|#\s*|:\s*|-\s*|DI\s+IDENTITA\s*)*[:\-]?\s*([A-Z0-9]{5,12})\b/g;
+  while ((mt = reNum.exec(S))) { var nn = mt[1]; if (/\d/.test(nn) && /\d{2,}|^[A-Z]{1,3}\d/.test(nn) && !dataNorm(nn) && !/^\d{1,4}$/.test(nn)) { metti("numero_documento", nn, "frase", "scritto dopo «" + mt[0].replace(nn, "").trim().toLowerCase() + "»"); break; } }
+  if (!r.numero_documento) { var cie = /\b(C[A-Z]\d{5}[A-Z]{2})\b/.exec(S); if (cie) metti("numero_documento", cie[1], "forma", "ha la forma del numero della carta d'identità elettronica (C + lettera + 5 cifre + 2 lettere)"); }
+  if (!r.numero_documento) { var tk = T.split(/[\n,;]+/).map(function (x) { return x.trim(); }).filter(function (x) { return /^[A-Z0-9]{6,12}$/i.test(x) && /\d/.test(x) && /[A-Z]/i.test(x) && !dataNorm(x) && !cfValido(x.toUpperCase()); }); if (tk.length === 1) metti("numero_documento", tk[0].toUpperCase(), "forma", "unica sequenza di lettere e cifre che sembra un numero di documento"); }
+  if (r.numero_documento && /^C[A-Z0-9]/.test(r.numero_documento) && r.numero_documento.length === 9 && !/^C[A-Z]\d{5}[A-Z]{2}$/.test(r.numero_documento) && /CARTA|IDENTITA|ITALIAN/.test(S) && fixCie(r.numero_documento)) { r.numero_documento = fixCie(r.numero_documento); r.come.numero_documento = "deduzione"; var nl_ = r.numero_documento; r.perche.numero_documento = "corretto: nella carta d'identità elettronica le ultime 2 sono lettere"; }
+  if (r.numero_documento && /^C[A-Z]\d{5}[A-Z]{2}$/.test(r.numero_documento)) tipo = "IDELE";
+  if (tipo) metti("tipo_documento", tipo, "frase", { IDENT: "si parla di carta d'identità", IDELE: "numero di carta d'identità elettronica", PASOR: "si parla di passaporto", PATEN: "si parla di patente" }[tipo]);
+  var mr = /RILASCIAT[AO]\s+(?:DAL\s+COMUNE\s+DI|DAL\s+|DALLA\s+|DA\s+|A\s+|IN\s+)?([A-Z][A-Z' ]{2,30})/.exec(S) || /ISSUED\s+(?:BY|IN|AT)\s+([A-Z][A-Z' ]{2,30})/.exec(S) || /COMUNE\s+DI\s+([A-Z][A-Z' ]{2,30})/.exec(S);
+  if (mr) { var rl = pulisciLuogo(mr[1]); if (rl.length >= 3) metti("rilascio_comune", rl, "frase", "«" + mr[0].toLowerCase().trim() + "»"); }
+  // --- luogo di nascita
+  var luogo = "", prov = "", ml;
+  if ((ml = /\b(?:NAT[OAIE]|NACID[OA]|NE[E]?|BORN|GEBOREN|NASCID[OA])\b[^\n]{0,40}?\b(?:A|IN|EN|A\s+LA|À|AD)\s+([A-Z][A-Z' .\-]{1,40}?)\s*(?:\(\s*([A-Z]{2})\s*\)|\s([A-Z]{2})\b(?=\s*(?:,|\.|IL|ON|EL|LE|AM|$|\n)))?(?=\s*(?:,|\.|;|\n|$|\s+IL\b|\s+ON\b|\s+EL\b|\s+LE\b|\s+AM\b|\s+\d|\s*\())/.exec(S.replace(/\bA\s+LA\b/g, "A"))))
+    { luogo = pulisciLuogo(ml[1]); prov = ml[2] || (ml[3] && provinciaValida(ml[3]) ? ml[3] : ""); if (luogo) metti("luogo", luogo, "frase", "«" + ml[0].trim().toLowerCase().slice(0, 50) + "»"); }
+  if (!r.luogo && (ml = /(?:PLACE\s+OF\s+BIRTH|BIRTHPLACE|LUOGO\s+DI\s+NASCITA|LIEU\s+DE\s+NAISSANCE|LUGAR\s+DE\s+NACIMIENTO|GEBURTSORT|COMUNE\s+DI\s+NASCITA)\s*[:\-]?\s*\n?\s*([A-Z][A-Z' .\-]{1,40}?)\s*(?:\(\s*([A-Z]{2})\s*\))?\s*(?:\n|,|$)/.exec(S))) { luogo = pulisciLuogo(ml[1]); prov = ml[2] || ""; if (luogo) metti("luogo", luogo, "etichetta", "dopo «" + ml[0].split(/[:\n]/)[0].trim().toLowerCase() + "»"); }
+  if (!r.luogo && (ml = /(?:^|[\n,]\s*)([A-Z][A-Z' .\-]{1,40}?)\s*\(\s*([A-Z]{2})\s*\)/m.exec(S)) && provinciaValida(ml[2])) { luogo = pulisciLuogo(ml[1]); prov = ml[2]; metti("luogo", luogo, "forma", "«" + ml[1].trim() + " (" + ml[2] + ")»: comune con la sigla della provincia"); }
+  if (!r.luogo && (ml = /(?:^|,)[ \t]*([A-Z][A-Z' .\-]{1,40}?)[ \t]+([A-Z]{2})[ \t]*(?:,|$)/m.exec(S)) && provinciaValida(ml[2]) && (disc || /,/.test(T))) { luogo = pulisciLuogo(ml[1]); prov = ml[2]; metti("luogo", luogo, "forma", "«" + ml[1].trim() + " " + ml[2] + "»: comune con la sigla della provincia"); }
+  if (!r.luogo && opz.eLuogo) { var righe0 = T.split(/[\n,;]+/).map(function (x) { return x.trim(); }); for (var z = 0; z < righe0.length; z++) { var cl = sa(righe0[z]).toUpperCase(); if (cl.length >= 3 && !/\d/.test(cl) && opz.eLuogo(cl)) { luogo = cl; metti("luogo", cl, "tabella", "«" + righe0[z] + "» è un comune della tabella"); break; } } }
+  if (r.luogo) { var tmp = {}; luogoDa(prov ? r.luogo + " (" + prov + ")" : r.luogo, tmp); if (/\b(U\.?S\.?A|USA|UK|U\.?K)\b/.test(r.luogo)) luogoDa(r.luogo.replace(/\s*\(.*$/, ""), tmp); r.luogo_p = tmp; }
+  // --- nome e cognome
+  var trovaNome = function () {
+    // 1) frasi: «mi chiamo…», «my name is…», «sono…», «Full name:…», «Nome e cognome:…»
+    var mf = /\b(?:MI[ \t]+CHIAMO|IL[ \t]+MIO[ \t]+NOME[ \t]+E|MY[ \t]+NAME[ \t]+IS|I'?M|I[ \t]+AM|SONO|JE[ \t]+M'?APPELLE|JE[ \t]+SUIS|ME[ \t]+LLAMO|SOY|MEIN[ \t]+NAME[ \t]+IST|ICH[ \t]+HEISSE|ICH[ \t]+BIN|FULL[ \t]+NAME|NOME[ \t]+E[ \t]+COGNOME|COGNOME[ \t]+E[ \t]+NOME|NAME|NOMINATIVO|OSPITE|GUEST)\b[ \t]*[:\-]?[ \t]*((?:[A-Z][A-Z'\-]*\.?,?[ \t]+){0,4}[A-Z][A-Z'\-]+)/g, x;
+    var orig = sa(T);
+    while ((x = mf.exec(S))) {
+      var testo_ = x[1].replace(/\s+(NAT[OA]|BORN|NE[E]?|NACID[OA]|GEBOREN|E|AND|ET|Y|UND|IL|ON|LE|EL|DI|DA|FROM|DE|VON|AUS|THE)\s.*$/, function (m0, w) { return /^(DI|DA|DE|VON)$/.test(w) ? m0 : ""; }).trim();
+      var w = testo_.replace(/,/g, " , ").split(/\s+/).filter(Boolean), vir = w.indexOf(",");
+      var stop = -1; w.forEach(function (y, j) { if (stop < 0 && y !== "," && NON_NOMI.test(y.replace(/[^A-Z]/g, "")) && !PART.test(y)) stop = j; }); if (stop >= 0) w = w.slice(0, stop); // ci si ferma alla prima parola che non è un nome («John Smith, I was…»)
+      if (vir >= w.length) vir = -1; if (vir > 0 && w.length - vir - 1 < 1) { w = w.slice(0, vir); vir = -1; }
+      w = w.filter(function (y) { return y !== ","; });
+      while (w.length && PART.test(w[w.length - 1])) w.pop();
+      if (w.length < 2 || NAZ_AGG[w[0]]) continue;
+      var og = orig.slice(x.index + x[0].length - x[1].length, x.index + x[0].length).replace(/,/g, " ").split(/\s+/).filter(Boolean);
+      var d = divideNome(w.slice(0, 5), { virgola: vir > 0 ? vir : null, ordine: 0, maiuscolo: og.some(function (o) { return /[a-z]/.test(o); }), orig: og });
+      if (d) return { d: d, come: "frase", perche: "«" + x[0].trim().toLowerCase().slice(0, 40) + "»" };
+    }
+    // 1b) «Bianchi Marco nato a…», «Marie Dupont, née le…»: le parole subito prima di «nato/born/né»
+    var rn = /(?:^|\n|[,;:.!]\s*|\s[-–]\s)[ \t]*((?:[A-Z][A-Z'\-]+[ \t]+){1,4}?[A-Z][A-Z'\-]+)[ \t]*,?[ \t]+(?:NAT[OA]|BORN|NEE?|NACID[OA]|GEBOREN|NASCID[OA])\b/g, y;
+    while ((y = rn.exec(S))) {
+      var w2 = y[1].split(/\s+/).filter(function (z) { return !NON_NOMI.test(z) || PART.test(z); }); if (w2.length < 2 || w2.length > 5) continue;
+      var st = y.index + y[0].indexOf(y[1]), og2 = orig.slice(st, st + y[1].length).split(/\s+/);
+      var d2 = divideNome(w2, { maiuscolo: og2.some(function (o) { return /[a-z]/.test(o); }), orig: og2, ordine: og2.some(function (o) { return /[a-z]/.test(o); }) ? 0 : 1 });
+      if (d2) return { d: d2, come: d2.certo ? "dizionario" : "deduzione", perche: d2.certo ? "«" + d2.nome + "» è un nome proprio, quindi «" + d2.cognome + "» è il cognome" : "nome e cognome prima di «" + y[0].trim().split(/\s+/).pop().toLowerCase() + "»: ordine da controllare" };
+    }
+    // 2) righe o pezzi (tra virgole) fatti solo di parole che sembrano nomi
+    var pezzi = T.split(/\n|[,;]|\s[-–—|]\s/).map(function (y) { return y.trim(); }).filter(Boolean), nomiR = [];
+    pezzi.forEach(function (y, i) {
+      var u = sa(y).toUpperCase().replace(/^(SIG\.?R?A?|MR|MRS|MS|DOTT\.?S?S?A?|DR)\.?\s+/, "");
+      if (/\d|@|:/.test(u) || u.length < 2 || u.length > 45) return;
+      var ww = u.split(/\s+/).filter(Boolean); if (ww.length > 4) return;
+      if (ww.some(function (z) { return !/^[A-Z'\-]+$/.test(z) || (NON_NOMI.test(z) && !PART.test(z)) || NAZ_AGG[z] || MESI_L[z]; })) return;
+      if (r.luogo && N_(u) === N_(r.luogo)) return; if (r.rilascio_comune && N_(u) === N_(r.rilascio_comune)) return;
+      if (/^[MF]$/.test(u) || (u.length === 3 && MRZ && MRZ.PAESI && MRZ.PAESI[u])) return;
+      if (opz.eLuogo && ww.length <= 3 && opz.eLuogo(u) && !ww.some(function (z) { return GENERE[z]; })) return; // è un comune, non un nome
+      nomiR.push({ u: u, w: ww, i: i, o: sa(y).split(/\s+/) });
+    });
+    if (nomiR.length >= 2 && nomiR[0].w.length <= 3 && nomiR[1].w.length <= 3 && nomiR[1].i - nomiR[0].i <= 2) { // due righe: cognome e nome (o il contrario)
+      var a = nomiR[0], b = nomiR[1], ga = a.w.filter(function (z) { return GENERE[z]; }).length / a.w.length, gb = b.w.filter(function (z) { return GENERE[z]; }).length / b.w.length;
+      var cogPrima = gb >= ga; // nelle note e nei moduli italiani di solito prima il cognome
+      return { d: { cognome: (cogPrima ? a : b).u, nome: (cogPrima ? b : a).u, certo: ga !== gb }, come: ga !== gb ? "dizionario" : "deduzione", perche: ga !== gb ? "«" + (cogPrima ? b : a).u + "» è un nome proprio, l'altra riga è il cognome" : "due righe con parole: la prima è il cognome (ordine dei moduli)" };
+    }
+    if (nomiR.length >= 1 && nomiR[0].w.length >= 2) { var dd = divideNome(nomiR[0].w, { maiuscolo: nomiR[0].o.some(function (o) { return /[a-z]/.test(o); }), orig: nomiR[0].o, ordine: 1 }); if (dd) return { d: dd, come: dd.certo ? "dizionario" : "deduzione", perche: dd.certo ? "«" + dd.nome + "» è un nome proprio" : "ordine più probabile" }; }
+    return null;
+  };
+  var tn = trovaNome();
+  if (tn) {
+    var dn2 = tn.d;
+    if (cf) { // il codice fiscale decide l'ordine
+      var c1 = cfLettere(dn2.cognome, false) === r.codice_fiscale.slice(0, 3) && cfLettere(dn2.nome, true) === r.codice_fiscale.slice(3, 6);
+      var c2 = cfLettere(dn2.nome, false) === r.codice_fiscale.slice(0, 3) && cfLettere(dn2.cognome, true) === r.codice_fiscale.slice(3, 6);
+      if (c2 && !c1) { var tt = dn2.cognome; dn2 = { cognome: dn2.nome, nome: tt, certo: true }; tn.come = "codice fiscale"; tn.perche = "il codice fiscale dice quale è il cognome"; }
+      else if (c1) { tn.come = "codice fiscale"; tn.perche = "confermato dal codice fiscale"; }
+    }
+    metti("cognome", norm(dn2.cognome), tn.come, tn.perche); metti("nome", norm(dn2.nome), tn.come, tn.perche);
+    var gN = GENERE[(dn2.nome || "").split(" ")[0]];
+    if (!r.sesso && (gN === "M" || gN === "F")) metti("sesso", gN, "dizionario", "«" + dn2.nome.split(" ")[0] + "» di solito è un nome " + (gN === "M" ? "maschile" : "femminile") + "");
+  }
+  if (!r.cittadinanza && r.tipo_documento === "IDELE") metti("cittadinanza", "ITA", "deduzione", "la carta d'identità elettronica italiana la hanno i cittadini italiani");
+  if (!r.cittadinanza && r.luogo_p && r.luogo_p.provincia_nascita && /CARTA\s+D.?\s*IDENTITA|ITALIAN/.test(S)) metti("cittadinanza", "ITA", "deduzione", "nato in Italia con carta d'identità italiana");
+  return r;
+}
+/* sesso mancante (la «M/F» sulla carta è una lettera sola, l'OCR la perde spesso): si propone quello del nome, sempre da controllare. Non sulla patente. */
+function sessoDalNome(p) {
+  if (!p || p.sesso || !p.nome || p.tipo_documento === "PATEN") return p;
+  var n = sa(p.nome).toUpperCase().split(/\s+/)[0], g = GENERE[n]; if (g !== "M" && g !== "F") return p;
+  p.sesso = g; p.euristico = (p.euristico || []).concat(["sesso"]); p.dubbi = (p.dubbi || []).concat(["sesso"]); p.avvisi = (p.avvisi || []).concat(["Sesso non letto: «" + n + "» di solito è un nome " + (g === "M" ? "maschile" : "femminile") + ". Controllalo."]);
+  p.perche = p.perche || {}; p.perche.sesso = "«" + n + "» di solito è un nome " + (g === "M" ? "maschile" : "femminile"); return p;
+}
+/* un messaggio con più persone («Siamo in due: Bianchi Marco nato… / Rossi Elena nata…»): un pezzo per ogni riga con una data di nascita */
+function ragionaTutti(t, opz) {
+  var righe = String(t || "").replace(/\r/g, "").split("\n"), pezzi = [], cur = null;
+  righe.forEach(function (r) {
+    var conData = dateNelTesto(r).length > 0 && /[A-Za-z]{3}/.test(r);
+    if (conData && cur && dateNelTesto(cur.join("\n")).length && nomePrimaDi(r)) { pezzi.push(cur); cur = null; }
+    if (!cur) { if (!conData && !pezzi.length) return; cur = []; } // le righe di saluto prima della prima persona non servono
+    cur.push(r);
+  });
+  if (cur) pezzi.push(cur);
+  if (pezzi.length < 2) return null;
+  var P = pezzi.map(function (x) { var tx = x.join("\n"), r = ragiona(tx, opz); r.testo = tx; return r; });
+  if (P.filter(function (r) { return ["cognome", "nome", "data_nascita"].every(function (k) { return r[k]; }); }).length < 2) return null;
+  return P;
+}
+function nomePrimaDi(r) { return /^[ \t]*[-•*\d.)]*[ \t]*[A-Za-zÀ-ÿ'][A-Za-zÀ-ÿ'\-]+[ \t]+[A-Za-zÀ-ÿ']/.test(r); }
+/* il ragionatore entra nella lettura: riempie quello che manca e, se il testo non ha etichette (messaggio, elenco), fa da lettore principale */
+function conRagiona(P, t, OPZ) {
+  var r = ragiona(t, OPZ), K = [["cognome"], ["nome"], ["data_nascita"], ["sesso"], ["cittadinanza"], ["numero_documento"], ["tipo_documento"], ["rilascio_comune"], ["codice_fiscale"]];
+  var forti = ["frase", "etichetta", "codice fiscale", "verifica", "tabella"];
+  var nuc = ["cognome", "nome", "data_nascita", "numero_documento", "sesso"].filter(function (k) { return r[k]; }).length;
+  if (!P.length) { if (nuc < 3) return P; P.push({ pulizia: [], euristico: [], dubbi: [], avvisi: [] }); }
+  if (P.length !== 1) return P;
+  var p = P[0]; p.euristico = p.euristico || []; p.perche = p.perche || {};
+  var discorsivo = discorsivoDi(t);
+  var etichette = (t.match(/\b(COGNOME|SURNAME|NOME|GIVEN NAMES?|NAME|SESSO|SEX|NATIONALITY|CITTADINANZA|DATE OF BIRTH|DATA DI NASCITA)\b/gi) || []).length;
+  K.forEach(function (x) {
+    var k = x[0], v = r[k]; if (!v) return;
+    var forte = forti.indexOf(r.come[k]) >= 0 || ((k === "cognome" || k === "nome") && r.come[k] === "dizionario"), deb = !p[k] || (p.euristico.indexOf(k) >= 0 && forte) || (typeof p[k] === "string" && eEtichetta(p[k]));
+    if (k === "data_nascita" && p[k] && p[k] !== v && (r.come[k] === "frase" || r.come[k] === "verifica" || r.come[k] === "codice fiscale") && !p.mrz) deb = true;
+    if ((k === "cognome" || k === "nome") && p.cognome && p.nome && etichette >= 2 && !discorsivo && !p.mrz && r.come[k] !== "codice fiscale") return; // documento con etichette: comanda la lettura per etichette
+    if ((k === "cognome" || k === "nome") && discorsivo && (forte || r.come[k] === "dizionario") && p[k] !== v) deb = true; // messaggio scritto: le frasi valgono più delle «etichette» trovate in mezzo
+    if ((k === "cognome" || k === "nome") && r.come[k] === "codice fiscale" && p[k] && p[k] !== v && !p.mrz) deb = true;
+    if (!deb || (p.mrz && p[k])) return;
+    if ((k === "sesso" || k === "cittadinanza") && (p.tipo_documento === "PATEN" || r.tipo_documento === "PATEN") && !forte) return; // la patente non li ha: non si indovinano
+    p[k] = v; p.perche[k] = r.perche[k];
+    if (!forte) { if (p.euristico.indexOf(k) < 0) p.euristico.push(k); } else if (discorsivo) p.euristico = p.euristico.filter(function (z) { return z !== k; });
+  });
+  if (r.luogo_p && discorsivo && forti.indexOf(r.come.luogo) >= 0) { p.comune_nascita = ""; p.provincia_nascita = ""; p.luogo_nascita = ""; p.stato_nascita = ""; }
+  if (r.luogo_p && !p.comune_nascita && !p.luogo_nascita && !p.stato_nascita) { Object.keys(r.luogo_p).forEach(function (k) { p[k] = r.luogo_p[k]; }); p.perche.luogo = r.perche.luogo; if (forti.indexOf(r.come.luogo) < 0) p.euristico.push("comune_nascita"); }
+  if (r.cittadinanza && p.cittadinanza && r.come.cittadinanza === "frase" && p.euristico.indexOf("cittadinanza") >= 0) p.cittadinanza = r.cittadinanza;
+  Object.keys(r.perche).forEach(function (k) { if (!p.perche[k] && p[k] && String(p[k]) === String(r[k])) p.perche[k] = r.perche[k]; });
+  // ciò che il ragionatore ha solo dedotto va controllato nella schermata «Controlla prima di inserire»
+  p.dubbi = p.dubbi || []; p.avvisi = p.avvisi || [];
+  var NOMEC = { cognome: "cognome", nome: "nome", data_nascita: "data di nascita", sesso: "sesso", cittadinanza: "cittadinanza", numero_documento: "numero del documento", tipo_documento: "tipo di documento", comune_nascita: "luogo di nascita" };
+  p.euristico.forEach(function (k) { if (p.dubbi.indexOf(k) >= 0 || !NOMEC[k]) return; p.dubbi.push(k); var pk = k === "comune_nascita" ? "luogo" : k; p.avvisi.push("«" + NOMEC[k] + "» dedotto" + (p.perche[pk] ? " (" + p.perche[pk] + ")" : "") + ": controllalo."); });
+  return P;
+}
+
+var api = { sessoDalNome: sessoDalNome, ragiona: ragiona, ragionaTutti: ragionaTutti, dateNelTesto: dateNelTesto, divideNome: divideNome, _na: function (v) { return [nomeAncora(v), sembraEtichetta(v), pulisciValore(v)]; }, _ar: function (r) { return ancoreRiga(tokRiga(r)); }, _spaz: function (r) { return riga_spazzatura(r); }, ancore: ancore, paeseDoc: paeseDoc, codicePaese: codicePaese, CAPOLUOGO: CAPOLUOGO, unisci: unisci, leggi1: leggi1, riempiti: riempiti, largo: largo, ripara: ripara, euristica: euristica, dividi: dividi, correggiNumero: correggiNumero, blocchi: blocchi, raggruppa: raggruppa, mrzTutte: mrzTutte, cfValido: cfValido, cfControlla: cfControlla, leggi: leggi, persone: persone, confronta: confronta, dataNorm: dataNorm, tipoDocDa: tipoDocDa, sessoDa: sessoDa };
 if (typeof module !== "undefined" && module.exports) module.exports = api; else root.INC = api;
 })(this);
