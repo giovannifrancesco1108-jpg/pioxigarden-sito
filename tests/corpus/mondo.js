@@ -1,4 +1,4 @@
-/* Banco di prova «mondo»: 1150 documenti SINTETICI (dati inventati) di molti paesi, come escono dall'OCR di una foto.
+/* Banco di prova «mondo»: 1400 documenti SINTETICI (dati inventati) di molti paesi, come escono dall'OCR di una foto.
    Per ogni documento si conoscono i valori veri; si misura quanti campi il lettore ricava giusti:
    cognome, nome, sesso, data di nascita, luogo di nascita, cittadinanza, numero, tipo e luogo di rilascio.
    Quattro livelli: «pulito» (testo copiato bene), «foto» (OCR normale), «pessima» (OCR di una foto brutta), «copia» (testo copiato dal telefono con le righe in disordine).
@@ -250,6 +250,91 @@ function genera() {
         vero: Object.assign({ cognome: p.c, nome: p.n, sesso: p.s, data_nascita: dIT(p.d), numero: p.num }, m.vero) });
     }
   });
+  return D.concat(liberi());
+}
+
+/* ---------- «libero»: quello che gli ospiti scrivono davvero (WhatsApp, email, moduli), senza etichette o con frasi ---------- */
+const MESI_IT = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
+const MESI_ENL = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const MESI_ES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+const MESI_DE = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
+const BELF = { ROMA: "H501", MILANO: "F205", NAPOLI: "F839", TORINO: "L219", GENOVA: "D969", FIRENZE: "D612", BOLOGNA: "A944", PALERMO: "G273", BARI: "A662", CATANIA: "C351", VELLETRI: "L719", LATINA: "E472" };
+const PROV_B = { ROMA: "RM", MILANO: "MI", NAPOLI: "NA", TORINO: "TO", GENOVA: "GE", FIRENZE: "FI", BOLOGNA: "BO", PALERMO: "PA", BARI: "BA", CATANIA: "CT", VELLETRI: "RM", LATINA: "LT" };
+function cfDi(c, n, s, d, com) { // codice fiscale vero (calcolato) per dati inventati
+  const L = (x, nome) => { const l = N(x).replace(/[^A-Z]/g, ""), co = l.replace(/[AEIOU]/g, ""), vo = l.replace(/[^AEIOU]/g, ""); let k = co; if (nome && co.length >= 4) k = co[0] + co[2] + co[3]; return (k + vo + "XXX").slice(0, 3); };
+  const D = { 0: 1, 1: 0, 2: 5, 3: 7, 4: 9, 5: 13, 6: 15, 7: 17, 8: 19, 9: 21, A: 1, B: 0, C: 5, D: 7, E: 9, F: 13, G: 15, H: 17, I: 19, J: 21, K: 2, L: 4, M: 18, N: 20, O: 11, P: 3, Q: 6, R: 8, S: 12, T: 14, U: 16, V: 10, W: 22, X: 25, Y: 24, Z: 23 };
+  const cf = L(c) + L(n, true) + String(d.a).slice(2) + "ABCDEHLMPRST"[d.m - 1] + p2(d.g + (s === "F" ? 40 : 0)) + BELF[com];
+  let t = 0; for (let i = 0; i < 15; i++) { const ch = cf[i]; t += i % 2 === 0 ? D[ch] : /\d/.test(ch) ? +ch : ch.charCodeAt(0) - 65; }
+  return cf + String.fromCharCode(65 + t % 26);
+}
+const tit = (x) => x.toLowerCase().replace(/(^|[ '\-])([a-zà-ÿ])/g, (m, a, b) => a + b.toUpperCase());
+const MSG = {
+  MSG_IT(p) { // messaggio di un ospite italiano
+    const nato = p.s === "F" ? "nata" : "nato", nome = caso(0.5) ? tit(p.n) + " " + tit(p.c) : tit(p.c) + " " + tit(p.n);
+    const data = pick([dIT(p.d), dIT(p.d, "."), p.d.g + "/" + p.d.m + "/" + String(p.d.a).slice(2), p.d.g + " " + MESI_IT[p.d.m - 1] + " " + p.d.a]);
+    const doc = pick(["carta d'identità " + p.num, "CI n. " + p.num, "documento: carta d'identità numero " + p.num, "carta identità elettronica " + p.num + " rilasciata dal comune di " + tit(p.ril)]);
+    const t = pick([
+      `Buongiorno, sono ${nome}, ${nato} a ${tit(p.com[0])} (${p.com[1]}) il ${data}. ${doc[0].toUpperCase() + doc.slice(1)}. Grazie!`,
+      `Ciao! Ecco i miei dati:\n${nome}\n${nato} il ${data} a ${tit(p.com[0])}\n${doc}\ncittadinanza italiana`,
+      `Salve, per il check-in: mi chiamo ${nome}, ${nato} a ${tit(p.com[0])} ${p.com[1]} il ${data}, ${doc}.`,
+      `${nome}\n${data}\n${tit(p.com[0])} (${p.com[1]})\n${doc}`]);
+    return { testo: t, vero: { citt: /italiana|nato|nata/.test(t) ? "ITA" : null, luogo: p.com[0], tipo: null, ril: /rilasciata dal comune/.test(t) ? p.ril : null, sesso: /\bnat[oa]\b/.test(t) ? p.s : null, nomeSoloSePossibile: true } };
+  },
+  MSG_EN(p) {
+    const name = caso(0.6) ? tit(p.n) + " " + tit(p.c) : tit(p.c) + ", " + tit(p.n);
+    const date = pick([MESI_ENL[p.d.m - 1] + " " + p.d.g + ", " + p.d.a, p.d.g + " " + MESI_ENL[p.d.m - 1] + " " + p.d.a, p2(p.d.g) + "/" + p2(p.d.m) + "/" + p.d.a]);
+    const naz = { GBR: "British", USA: "American", IRL: "Irish", CAN: "Canadian", AUS: "Australian" }[p.paese] || p.paese;
+    const sesso = caso(0.5) ? (p.s === "M" ? "male" : "female") : "";
+    const t = pick([
+      `Hi! Here are my details for the check-in:\nFull name: ${name}\nDate of birth: ${date}\nPlace of birth: ${tit(p.citta)}\nNationality: ${naz}\nPassport number: ${p.num}${sesso ? "\nSex: " + sesso : ""}`,
+      `Hello, my name is ${name}, I was born in ${tit(p.citta)} on ${date}. I'm ${naz}${sesso ? ", " + sesso : ""}. My passport number is ${p.num}. Thanks!`,
+      `${name} - born ${date} in ${tit(p.citta)} - ${naz} passport ${p.num}`]);
+    return { testo: t, vero: { citt: p.paese, luogo: p.citta, tipo: "PASOR", ril: null, sesso: sesso ? p.s : null } };
+  },
+  MSG_FR(p) {
+    const ne = p.s === "F" ? "née" : "né", date = pick([p.d.g + " " + ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"][p.d.m - 1] + " " + p.d.a, dIT(p.d)]);
+    const t = `Bonjour, je m'appelle ${tit(p.n)} ${p.c}, ${ne} le ${date} à ${tit(p.citta)}. Nationalité française, carte d'identité n° ${p.num}.`;
+    return { testo: t, vero: { citt: "FRA", luogo: p.citta, tipo: "IDENT", ril: null, sesso: p.s } };
+  },
+  MSG_ES(p) {
+    const date = pick([p.d.g + " de " + MESI_ES[p.d.m - 1] + " de " + p.d.a, dIT(p.d)]), nac = p.s === "F" ? "nacida" : "nacido";
+    const t = `Hola! Me llamo ${tit(p.n)} ${tit(p.c)}, ${nac} en ${tit(p.citta)} el ${date}. Nacionalidad española, DNI ${p.num}.`;
+    return { testo: t, vero: { citt: "ESP", luogo: p.citta, tipo: "IDENT", ril: null, sesso: p.s } };
+  },
+  MSG_DE(p) {
+    const date = pick([p.d.g + ". " + MESI_DE[p.d.m - 1] + " " + p.d.a, dIT(p.d, ".")]);
+    const t = `Hallo, mein Name ist ${tit(p.n)} ${tit(p.c)}, geboren am ${date} in ${tit(p.citta)}. Staatsangehörigkeit: deutsch. Reisepass Nr. ${p.num}`;
+    return { testo: t, vero: { citt: "DEU", luogo: p.citta, tipo: "PASOR", ril: null, sesso: null } };
+  },
+  ELENCO(p) { // solo valori, uno per riga, ordine a caso (copiato da una nota)
+    const v = [p.c, p.n, dIT(p.d), p.com[0] + " (" + p.com[1] + ")", p.s, "ITA", p.num]; const o = v.slice(2); for (let i = o.length - 1; i > 0; i--) { const j = int(0, i); [o[i], o[j]] = [o[j], o[i]]; }
+    return { testo: [p.c, p.n].concat(o).join("\n"), vero: { citt: "ITA", luogo: p.com[0], tipo: null, ril: null, sesso: p.s } };
+  },
+  RIGA(p) { // tutto su una riga, separato da virgole
+    return { testo: [p.c, p.n, p.s, dIT(p.d), p.com[0] + " " + p.com[1], "italiana", p.num].join(", "), vero: { citt: "ITA", luogo: p.com[0], tipo: null, ril: null, sesso: p.s } };
+  },
+  CF(p) { // tessera sanitaria / codice fiscale: niente sesso scritto, data e sesso nel codice
+    const com = pick(Object.keys(BELF)), cf = cfDi(p.c, p.n, p.s, p.d, com);
+    const t = pick([`TESSERA SANITARIA\nCodice fiscale\n${cf}\nCognome\n${p.c}\nNome\n${p.n}\nLuogo di nascita\n${com}\nProvincia\n${PROV_B[com]}\nData di nascita\n${dIT(p.d)}\nSesso\n${p.s}`,
+      `${tit(p.n)} ${tit(p.c)}\nCF ${cf}\ncarta d'identità ${p.num}`]);
+    return { testo: t, vero: { citt: null, luogo: /Luogo/.test(t) ? com : null, tipo: null, ril: null, sesso: p.s, cfDa: !/Sesso/.test(t), dataDaCF: !/Data di nascita/.test(t), numero: /carta/.test(t) ? p.num : null } };
+  },
+};
+function liberi() {
+  const D = [], piano = [["MSG_IT", 70], ["MSG_EN", 50], ["MSG_FR", 15], ["MSG_ES", 15], ["MSG_DE", 15], ["ELENCO", 30], ["RIGA", 25], ["CF", 30]];
+  const PAESE = { MSG_EN: ["GBR", "USA", "IRL", "CAN", "AUS"], MSG_FR: ["FRA"], MSG_ES: ["ESP"], MSG_DE: ["DEU"] };
+  let i = 5000;
+  piano.forEach(([m, n]) => {
+    for (let k = 0; k < n; k++) {
+      const paese = PAESE[m] ? pick(PAESE[m]) : "ITA", p = persona(paese);
+      p.com = pick(COMUNI); p.ril = pick(RILASCIO_IT);
+      p.num = paese === "ITA" ? "C" + pick(["A", "A", "B"]) + rd(5) + rl(2) : paese === "ESP" ? rd(8) + rl(1) : paese === "FRA" ? rl(2) + rd(2) + rl(1) + rd(1) + rl(1) + rd(2) : rl(2) + rd(7);
+      if (paese !== "ITA" && !p.citta) p.citta = "LONDON";
+      const r = MSG[m](p), v = r.vero;
+      D.push({ i: ++i, liv: "libero", modello: m, paese, testo: r.testo, pulito: r.testo,
+        vero: { libero: true, cognome: p.c, nome: p.n, sesso: v.sesso, noSesso: v.sesso == null, data_nascita: dIT(p.d), numero: v.numero === null ? null : p.num, noNumero: v.numero === null, citt: v.citt, noCitt: v.citt == null, luogo: v.luogo, noLuogo: !v.luogo, tipo: v.tipo, ril: v.ril } });
+    }
+  });
   return D;
 }
 
@@ -260,11 +345,11 @@ function confronta(p, v) {
   const r = {};
   r.cognome = N(p.cognome) === N(v.cognome);
   r.nome = N(p.nome) === N(v.nome);
-  r.sesso = v.noSesso ? (p.sesso ? false : null) : p.sesso === v.sesso;
+  r.sesso = v.noSesso ? (p.sesso && !v.libero ? false : null) : p.sesso === v.sesso; // nei messaggi un sesso dedotto (dal nome) non si giudica
   r.data = p.data_nascita === v.data_nascita;
   if (!v.noLuogo && v.luogo) { const cand = [p.comune_nascita, p.luogo_nascita, p.stato_nascita].filter(Boolean); r.luogo = cand.some((x) => N(x) === N(v.luogo) || stessoPaese(x, v.luogo)); } else r.luogo = null;
-  r.citt = v.noCitt ? (p.cittadinanza ? false : null) : stessoPaese(p.cittadinanza, v.citt);
-  r.numero = N(p.numero_documento) === N(v.numero);
+  r.citt = v.noCitt ? (p.cittadinanza && !v.libero ? false : null) : stessoPaese(p.cittadinanza, v.citt);
+  r.numero = v.noNumero ? null : N(p.numero_documento) === N(v.numero);
   r.tipo = !v.tipo ? null : p.tipo_documento === v.tipo || (v.tipo === "IDELE" && p.tipo_documento === "IDENT");
   r.rilascio = !v.ril ? null : (p.rilascio_comune && N(p.rilascio_comune) === N(v.ril)) || stessoPaese(p.rilascio_stato, v.ril) || stessoPaese(p.rilascio_comune, v.ril);
   return r;
@@ -275,7 +360,7 @@ if (require.main === module) {
   const mostra = process.argv.includes("--errori"), solo = { liv: arg("livello"), paese: arg("paese"), modello: arg("modello") };
   const D = genera().filter((d) => (!solo.liv || d.liv === solo.liv) && (!solo.paese || d.paese === solo.paese) && (!solo.modello || d.modello === solo.modello));
   const campi = ["cognome", "nome", "sesso", "data", "luogo", "citt", "numero", "tipo", "rilascio"];
-  const tot = {}, perLiv = {}, perMod = {}, perPaese = {}; let n = 0, perfetti = { pulito: [0, 0], foto: [0, 0], pessima: [0, 0], copia: [0, 0] }, persone1 = 0;
+  const tot = {}, perLiv = {}, perMod = {}, perPaese = {}; let n = 0, perfetti = { pulito: [0, 0], foto: [0, 0], pessima: [0, 0], copia: [0, 0], libero: [0, 0] }, persone1 = 0;
   D.forEach((d) => {
     const ps = INC.leggi(d.testo).persone; if (ps.length === 1) persone1++;
     const p = ps.sort((a, b) => Object.keys(b).length - Object.keys(a).length)[0] || {};

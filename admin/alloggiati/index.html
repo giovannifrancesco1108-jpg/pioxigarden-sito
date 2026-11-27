@@ -61,7 +61,7 @@ details[open].card>summary::after{content:"▴"}
 .dubbio input,.dubbio select{border-color:var(--warn);box-shadow:0 0 0 1px var(--warn) inset}
 .dubbio>span.t::after{content:" · controlla";color:var(--warn)}
 .manca input,.manca select{border-color:var(--bad)}
-.rev{display:grid;gap:10px}.rev .p{border:1px solid var(--line,#d8d8d8);border-radius:12px;padding:10px;display:grid;gap:4px}.rev .p label{display:flex;gap:8px;align-items:center;font-weight:700}.rev .p small{display:block}.rev .p .ko{color:var(--bad)}.rev .p .av{color:var(--warn)}
+.rev{display:grid;gap:10px}.rev .p{border:1px solid var(--line,#d8d8d8);border-radius:12px;padding:10px;display:grid;gap:4px}.rev .p label{display:flex;gap:8px;align-items:center;font-weight:700}.rev .p small{display:block}.rev .p .ko{color:var(--bad)}.rev .p .av{color:var(--warn)}.rev .perche summary{font-size:.9em;color:inherit;opacity:.85;cursor:pointer;text-decoration:underline}.rev .perche small{margin-top:3px}
 .cm{display:block;font-size:12px;margin-top:3px}.cm.ko{color:var(--bad)}.cm.av{color:var(--warn)}
 #incT{width:100%;min-height:110px;font:14px/1.4 ui-monospace,monospace}
 .esito{font-size:14px;font-weight:600;margin:0}.esito.ok{color:var(--good)}.esito.ko{color:var(--bad)}
@@ -85,7 +85,7 @@ details[open].card>summary::after{content:"▴"}
 </head>
 <body>
 <main>
-<header><h1>Alloggiati Web<small>Comunicazione degli ospiti alla Questura</small></h1><p style="margin:4px 0 0;font-weight:700;color:#0a7a3d">VERSIONE 13 · INCOLLA E LEGGI + COMUNI PRECISI</p><a class="btn g s" href="/admin/">← Pannello</a></header>
+<header><h1>Alloggiati Web<small>Comunicazione degli ospiti alla Questura</small></h1><p style="margin:4px 0 0;font-weight:700;color:#0a7a3d">VERSIONE 14 · CAPISCE ANCHE I MESSAGGI + SPIEGA PERCHÉ</p><a class="btn g s" href="/admin/">← Pannello</a></header>
 
 <section class="card" id="auth" hidden>
  <h2>Accedi</h2>
@@ -137,7 +137,7 @@ details[open].card>summary::after{content:"▴"}
  </div>
  <details id="inc"><summary><b>📋 Incolla il testo del documento</b></summary>
   <div style="display:grid;gap:8px;margin-top:8px">
-   <textarea id="incT" placeholder="Incolla qui il testo copiato, anche le righe con &lt;&lt;&lt;: cognome, nome, data di nascita, numero… Funziona anche senza internet." spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+   <textarea id="incT" placeholder="Incolla qui il testo copiato dal documento (anche le righe con &lt;&lt;&lt;) oppure il messaggio o l'email dell'ospite con i suoi dati, anche di più persone. Funziona anche senza internet." spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
    <div class="row"><button class="btn" type="button" id="incGo">Leggi il testo</button><button class="btn g" type="button" id="incRi">↻ Riprova (lettura più larga)</button><button class="btn g" type="button" id="incAi" hidden>🤖 Controlla con l'AI · usa token AI</button><button class="btn g s" type="button" id="incPul">Svuota</button></div>
    <p class="hint">Il testo non viene salvato. Dopo la lettura controllo i codici, le cifre di controllo e, se hai fotografato il documento, confronto foto e testo.</p>
    <p class="msg" id="mI" role="status"></p>
@@ -524,6 +524,8 @@ function mostraRevisione(P){
   var td=TAB.doc.filter(function(x){return x.c===g.doc})[0];
   h+="<small>"+esc("Documento: "+(td?td.n:g.doc||"?")+" n. "+(g.num||"?")+" · rilasciato a "+(g.ril?etich(perCodice(g.ril)):"?"))+"</small>";
   (r.p.fonti||[]).length>1&&(h+='<small class="av">Letto da testo e da MRZ: '+esc(g.conf||"")+"</small>");
+  var NP={cognome:"Cognome",nome:"Nome",data_nascita:"Data di nascita",sesso:"Sesso",luogo:"Luogo di nascita",cittadinanza:"Cittadinanza",numero_documento:"Numero documento",tipo_documento:"Tipo documento",rilascio_comune:"Rilasciato a"},pq=r.p.perche||{},ek=Object.keys(NP).filter(function(k){return pq[k]&&!(k==="nome"&&pq.nome===pq.cognome)});if(pq.cognome&&pq.cognome===pq.nome)NP.cognome="Cognome e nome";
+  if(ek.length){var eur=r.p.euristico||[];h+='<details class="perche"><summary>Perché ho letto così ('+ek.length+')</summary>'+ek.map(function(k){var dub=eur.indexOf(k)>=0||(k==="luogo"&&eur.indexOf("comune_nascita")>=0);return"<small"+(dub?' class="av"':"")+"><b>"+esc(NP[k])+"</b>: "+esc(pq[k])+(dub?" — da controllare":"")+"</small>"}).join("")+"</details>"}
   (r.p.avvisi||[]).forEach(function(a){h+='<small class="av">⚠️ '+esc(a)+"</small>"});
   Object.keys(r.err).forEach(function(k){h+='<small class="ko">✗ '+esc(F[k])+": "+esc(r.err[k])+"</small>"});
   Object.keys(r.avv).forEach(function(k){h+='<small class="av">⚠️ '+esc(F[k])+": "+esc(r.avv[k])+"</small>"});

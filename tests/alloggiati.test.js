@@ -254,3 +254,33 @@ console.log(n + " prove superate");
   assert.equal(c.comune_nascita, "SAN SEVERO"); assert.equal(c.provincia_nascita, "FG");
   console.log("ok  testo copiato dal telefono: etichette spezzate, «COGNOME / SUR», righe ripetute, date di emissione");
 })();
+
+// ---- RAGIONATORE: messaggi, elenchi, più lingue (dati INVENTATI) ----
+(function () {
+  const L = (t) => INC.leggi(t).persone;
+  let p = L("Buongiorno, sono Giulia Ferretti, nata a Velletri (RM) il 12 marzo 1985. Carta d'identità CA12345AB. Grazie!")[0];
+  assert.equal(p.cognome, "FERRETTI"); assert.equal(p.nome, "GIULIA"); assert.equal(p.sesso, "F"); assert.equal(p.data_nascita, "12/03/1985");
+  assert.equal(p.comune_nascita, "VELLETRI"); assert.equal(p.provincia_nascita, "RM"); assert.equal(p.numero_documento, "CA12345AB"); assert.equal(p.tipo_documento, "IDELE");
+  assert.ok(p.perche && p.perche.sesso, "spiega perché");
+  p = L("Hello, my name is John Smith, I was born in Leeds on March 3, 1979. I'm British, male. My passport number is AB1234567. Thanks!")[0];
+  assert.equal(p.cognome, "SMITH"); assert.equal(p.nome, "JOHN"); assert.equal(p.data_nascita, "03/03/1979"); assert.equal(p.cittadinanza, "GBR"); assert.equal(p.numero_documento, "AB1234567"); assert.equal(p.tipo_documento, "PASOR");
+  p = L("Bonjour, je m'appelle Camille DUPONT, née le 4 juillet 1990 à Lyon. Nationalité française, carte d'identité n° AB12C3D45.")[0];
+  assert.equal(p.cognome, "DUPONT"); assert.equal(p.nome, "CAMILLE"); assert.equal(p.sesso, "F"); assert.equal(p.data_nascita, "04/07/1990"); assert.equal(p.cittadinanza, "FRA");
+  p = L("Hallo, mein Name ist Lena Fischer, geboren am 2. März 1988 in Hamburg. Staatsangehörigkeit: deutsch. Reisepass Nr. C01X00T47")[0];
+  assert.equal(p.cognome, "FISCHER"); assert.equal(p.data_nascita, "02/03/1988"); assert.equal(p.cittadinanza, "DEU");
+  // elenco senza etichette e riga con virgole
+  p = L("ROSSI\nMARIO\nM\n03/04/1980\nITA\nCA98765ZZ\nANZIO (RM)")[0];
+  assert.equal(p.cognome, "ROSSI"); assert.equal(p.nome, "MARIO"); assert.equal(p.comune_nascita, "ANZIO");
+  p = L("DE ROSA, CHIARA, F, 07/07/1991, LATINA LT, italiana, CB11111AA")[0];
+  assert.equal(p.cognome, "DE ROSA"); assert.equal(p.nome, "CHIARA"); assert.equal(p.comune_nascita, "LATINA");
+  // la data più vecchia è la nascita, le altre sono arrivo/scadenza
+  p = L("Arriviamo il 14/12/2026. Sono Paolo Neri, nato il 01/02/1975, passaporto YA1234567 scadenza 05/05/2031")[0];
+  assert.equal(p.data_nascita, "01/02/1975");
+  // due persone nello stesso messaggio
+  const due = L("Ciao! Siamo in due:\nBianchi Marco nato a Frascati (RM) il 3/2/1984, carta d'identità CA11223BB\nRossi Elena nata a Velletri il 12 marzo 1987, CI CB44556CC");
+  assert.equal(due.length, 2); assert.equal(due[0].cognome, "BIANCHI"); assert.equal(due[1].nome, "ELENA"); assert.equal(due[1].sesso, "F");
+  // il sesso indovinato dal nome è sempre da controllare
+  p = L("VERDI\nANNA\n09/09/1999\nITA\nCA22334DD")[0];
+  assert.equal(p.sesso, "F"); assert.ok(p.dubbi.indexOf("sesso") >= 0);
+  console.log("ok  ragionatore: messaggi IT/EN/FR/DE, elenchi, date, più persone, perché e dubbi");
+})();
