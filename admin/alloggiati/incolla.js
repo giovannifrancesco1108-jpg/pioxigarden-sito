@@ -1158,6 +1158,13 @@ function ragiona(testo, opz) {
   if (!r.cittadinanza && r.luogo_p && r.luogo_p.provincia_nascita && /CARTA\s+D.?\s*IDENTITA|ITALIAN/.test(S)) metti("cittadinanza", "ITA", "deduzione", "nato in Italia con carta d'identità italiana");
   return r;
 }
+/* sesso mancante (la «M/F» sulla carta è una lettera sola, l'OCR la perde spesso): si propone quello del nome, sempre da controllare. Non sulla patente. */
+function sessoDalNome(p) {
+  if (!p || p.sesso || !p.nome || p.tipo_documento === "PATEN") return p;
+  var n = sa(p.nome).toUpperCase().split(/\s+/)[0], g = GENERE[n]; if (g !== "M" && g !== "F") return p;
+  p.sesso = g; p.euristico = (p.euristico || []).concat(["sesso"]); p.dubbi = (p.dubbi || []).concat(["sesso"]); p.avvisi = (p.avvisi || []).concat(["Sesso non letto: «" + n + "» di solito è un nome " + (g === "M" ? "maschile" : "femminile") + ". Controllalo."]);
+  p.perche = p.perche || {}; p.perche.sesso = "«" + n + "» di solito è un nome " + (g === "M" ? "maschile" : "femminile"); return p;
+}
 /* un messaggio con più persone («Siamo in due: Bianchi Marco nato… / Rossi Elena nata…»): un pezzo per ogni riga con una data di nascita */
 function ragionaTutti(t, opz) {
   var righe = String(t || "").replace(/\r/g, "").split("\n"), pezzi = [], cur = null;
@@ -1207,6 +1214,6 @@ function conRagiona(P, t, OPZ) {
   return P;
 }
 
-var api = { ragiona: ragiona, ragionaTutti: ragionaTutti, dateNelTesto: dateNelTesto, divideNome: divideNome, _na: function (v) { return [nomeAncora(v), sembraEtichetta(v), pulisciValore(v)]; }, _ar: function (r) { return ancoreRiga(tokRiga(r)); }, _spaz: function (r) { return riga_spazzatura(r); }, ancore: ancore, paeseDoc: paeseDoc, codicePaese: codicePaese, CAPOLUOGO: CAPOLUOGO, unisci: unisci, leggi1: leggi1, riempiti: riempiti, largo: largo, ripara: ripara, euristica: euristica, dividi: dividi, correggiNumero: correggiNumero, blocchi: blocchi, raggruppa: raggruppa, mrzTutte: mrzTutte, cfValido: cfValido, cfControlla: cfControlla, leggi: leggi, persone: persone, confronta: confronta, dataNorm: dataNorm, tipoDocDa: tipoDocDa, sessoDa: sessoDa };
+var api = { sessoDalNome: sessoDalNome, ragiona: ragiona, ragionaTutti: ragionaTutti, dateNelTesto: dateNelTesto, divideNome: divideNome, _na: function (v) { return [nomeAncora(v), sembraEtichetta(v), pulisciValore(v)]; }, _ar: function (r) { return ancoreRiga(tokRiga(r)); }, _spaz: function (r) { return riga_spazzatura(r); }, ancore: ancore, paeseDoc: paeseDoc, codicePaese: codicePaese, CAPOLUOGO: CAPOLUOGO, unisci: unisci, leggi1: leggi1, riempiti: riempiti, largo: largo, ripara: ripara, euristica: euristica, dividi: dividi, correggiNumero: correggiNumero, blocchi: blocchi, raggruppa: raggruppa, mrzTutte: mrzTutte, cfValido: cfValido, cfControlla: cfControlla, leggi: leggi, persone: persone, confronta: confronta, dataNorm: dataNorm, tipoDocDa: tipoDocDa, sessoDa: sessoDa };
 if (typeof module !== "undefined" && module.exports) module.exports = api; else root.INC = api;
 })(this);

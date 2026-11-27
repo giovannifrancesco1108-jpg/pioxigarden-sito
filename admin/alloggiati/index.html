@@ -61,7 +61,7 @@ details[open].card>summary::after{content:"▴"}
 .dubbio input,.dubbio select{border-color:var(--warn);box-shadow:0 0 0 1px var(--warn) inset}
 .dubbio>span.t::after{content:" · controlla";color:var(--warn)}
 .manca input,.manca select{border-color:var(--bad)}
-.rev{display:grid;gap:10px}.rev .p{border:1px solid var(--line,#d8d8d8);border-radius:12px;padding:10px;display:grid;gap:4px}.rev .p label{display:flex;gap:8px;align-items:center;font-weight:700}.rev .p small{display:block}.rev .p .ko{color:var(--bad)}.rev .p .av{color:var(--warn)}.rev .perche summary{font-size:.9em;color:inherit;opacity:.85;cursor:pointer;text-decoration:underline}.rev .perche small{margin-top:3px}
+.rev{display:grid;gap:10px}.rev .p{border:1px solid var(--line,#d8d8d8);border-radius:12px;padding:10px;display:grid;gap:4px}.rev .p label{display:flex;gap:8px;align-items:center;font-weight:700}.rev .p small{display:block}.rev .p .ko{color:var(--bad)}.rev .p .av{color:var(--warn)}.scans{display:grid;gap:12px;margin:8px 0}.scan{border:1px solid var(--line,#d8d8d8);border-radius:12px;padding:8px;display:grid;gap:6px}.scan img{width:100%;border-radius:8px;background:#fff;-webkit-user-select:auto;user-select:auto;-webkit-touch-callout:default}.scan .row{flex-wrap:wrap;gap:6px}.fs{position:fixed;inset:0;z-index:1000;background:#000;overflow:auto;-webkit-overflow-scrolling:touch;padding:8px}.fs img{width:100%;display:block;background:#fff;-webkit-user-select:auto;user-select:auto;-webkit-touch-callout:default}.fs canvas{display:block;margin:8px auto}.fsbar{position:sticky;top:0;display:flex;gap:8px;align-items:center;justify-content:space-between;background:#000;color:#fff;padding:6px 4px;z-index:2;font-size:.95em}.fsrow{justify-content:center;flex-wrap:wrap;gap:8px;margin:8px 0}.rev .perche summary{font-size:.9em;color:inherit;opacity:.85;cursor:pointer;text-decoration:underline}.rev .perche small{margin-top:3px}
 .cm{display:block;font-size:12px;margin-top:3px}.cm.ko{color:var(--bad)}.cm.av{color:var(--warn)}
 #incT{width:100%;min-height:110px;font:14px/1.4 ui-monospace,monospace}
 .esito{font-size:14px;font-weight:600;margin:0}.esito.ok{color:var(--good)}.esito.ko{color:var(--bad)}
@@ -85,7 +85,7 @@ details[open].card>summary::after{content:"▴"}
 </head>
 <body>
 <main>
-<header><h1>Alloggiati Web<small>Comunicazione degli ospiti alla Questura</small></h1><p style="margin:4px 0 0;font-weight:700;color:#0a7a3d">VERSIONE 14 · CAPISCE ANCHE I MESSAGGI + SPIEGA PERCHÉ</p><a class="btn g s" href="/admin/">← Pannello</a></header>
+<header><h1>Alloggiati Web<small>Comunicazione degli ospiti alla Questura</small></h1><p style="margin:4px 0 0;font-weight:700;color:#0a7a3d">VERSIONE 15 · SCANNER COME LE APP: BORDI, RADDRIZZA, COPIA IL TESTO</p><a class="btn g s" href="/admin/">← Pannello</a></header>
 
 <section class="card" id="auth" hidden>
  <h2>Accedi</h2>
@@ -146,6 +146,8 @@ details[open].card>summary::after{content:"▴"}
  </details>
  <label class="drop big" id="drop"><b>📷 Fotografa i documenti</b><span>Leggo le righe &lt;&lt;&lt; e il testo del documento qui sul telefono, poi li confronto. Ci mette qualche secondo per foto. Poi controlli tu.</span><input type="file" id="foto" accept="image/*" multiple></label>
  <div class="row" id="fotoRow" hidden><button class="btn g" type="button" id="fotoRi">↻ Riprova a leggere le foto</button><button class="btn g" type="button" id="fotoAi" hidden>🤖 Leggi le foto con l'AI · usa token AI</button></div>
+ <p class="hint" id="scansHint" hidden>📄 <b>Le tue scansioni.</b> Il modo più preciso: tieni premuto sul testo della scansione (o premi «Apri grande») → <b>Seleziona tutto</b> → <b>Copia</b>, poi <button class="btn s" type="button" id="scansInc">📋 Incolla e leggi</button>. Se il telefono non lo permette dalla pagina: «📤 Salva», apri la foto e copia da lì.</p>
+ <div id="scans" class="scans" hidden></div>
  <p class="hint" id="fotoHint" hidden>L'AI è facoltativa e consuma token (costa): usala solo se la lettura sul telefono non basta.</p>
  <div class="grid2">
   <label>Giorno di arrivo<input type="date" id="arr"></label>
@@ -308,8 +310,22 @@ function tela(im,rot,M){var w=im.naturalWidth,h=im.naturalHeight,s=Math.min(1,M/
  c.width=r?H:W;c.height=r?W:H;var x=c.getContext("2d");x.translate(c.width/2,c.height/2);x.rotate(rot*Math.PI/180);x.drawImage(im,-W/2,-H/2,W,H);
  var d=x.getImageData(0,0,c.width,c.height),p=d.data,mn=255,mx=0,i,g;for(i=0;i<p.length;i+=4){g=(p[i]*.3+p[i+1]*.59+p[i+2]*.11)|0;p[i]=g;if(g<mn)mn=g;if(g>mx)mx=g}
  var k=255/Math.max(1,mx-mn);for(i=0;i<p.length;i+=4){g=(p[i]-mn)*k;p[i]=p[i+1]=p[i+2]=g}x.putImageData(d,0,0);return c}
-/* «cam scanner»: ritaglia il documento, lo raddrizza, toglie ombre e alza il contrasto, tutto sul telefono. Se qualcosa va storto resta la foto originale. */
+/* «cam scanner» come le app: trova i 4 angoli del documento (anche fotografato di sbieco), lo raddrizza, toglie ombre e grigio.
+   Dà: img (grigio pulito, per la lettura), colore e bn (da guardare, ingrandire e copiare con «Testo dal vivo»). Se non trova i bordi
+   usa il vecchio metodo (raddrizza e ritaglia). Tutto sul telefono: le immagini non escono dalla pagina. */
+function telaDa(px,w,h){var c=document.createElement("canvas");c.width=w;c.height=h;var x=c.getContext("2d");var d=x.createImageData(w,h);d.data.set(px);x.putImageData(d,0,0);return c}
+function grigioDa(px,w,h){var g=SCAN.normalizza(SCAN.grigio(px,w,h),w,h),o=new Uint8ClampedArray(px.length),i,j=0;for(i=0;i<o.length;i+=4){o[i]=o[i+1]=o[i+2]=g[j++];o[i+3]=255}return o}
+function caricaIm(url){return new Promise(function(ok){var im=new Image();im.onload=function(){ok(im)};im.onerror=function(){ok(null)};im.src=url})}
+function finitura(px,w,h,quad,base){var col=SCAN.migliora(px,w,h),cb=telaDa(grigioDa(px,w,h),w,h),bnU=cb.toDataURL("image/jpeg",.92);
+ return Promise.all([caricaIm(bnU),quad?caricaIm(telaDa(px,w,h).toDataURL("image/jpeg",.95)):null]).then(function(v){if(!v[0])return null;
+  return{img:v[0],piatta:v[1],colore:telaDa(col,w,h).toDataURL("image/jpeg",.9),bn:bnU,quad:quad,base:base,w:w,h:h}})}
+function baseDi(im){var nw=im.naturalWidth,nh=im.naturalHeight,s=Math.min(1,2400/Math.max(nw,nh)),W=Math.round(nw*s),H=Math.round(nh*s),c=document.createElement("canvas");c.width=W;c.height=H;var x=c.getContext("2d",{willReadFrequently:true});x.drawImage(im,0,0,W,H);return{w:W,h:H,px:x.getImageData(0,0,W,H).data}}
+function conBordi(B,quad){var m=SCAN.misure(quad,1800),px=SCAN.raddrizza(B.px,B.w,B.h,quad,m.w,m.h);return px?finitura(px,m.w,m.h,quad,B):Promise.resolve(null)}
 function scansiona(im){return new Promise(function(ok){try{
+ var B=baseDi(im),q=SCAN.angoli(SCAN.grigio(B.px,B.w,B.h),B.w,B.h,B.px);
+ if(q&&q.sicurezza>=0.6)return conBordi(B,q.punti).then(function(r){if(r)r.bordi=true;ok(r||vecchia(im,B))},function(){ok(vecchia(im,B))});
+ vecchia(im,B).then(ok)}catch(e){ok(null)}})}
+function vecchia(im,B){return new Promise(function(ok){try{
  var nw=im.naturalWidth,nh=im.naturalHeight,L=Math.max(1600,Math.min(2400,Math.max(nw,nh))),s=L/Math.max(nw,nh);
  function piccola(src,sw,sh){var k=Math.min(1,700/Math.max(sw,sh)),c=document.createElement("canvas");c.width=Math.max(8,Math.round(sw*k));c.height=Math.max(8,Math.round(sh*k));var x=c.getContext("2d",{willReadFrequently:true});x.drawImage(src,0,0,c.width,c.height);var d=x.getImageData(0,0,c.width,c.height);return{g:SCAN.grigio(d.data,c.width,c.height),w:c.width,h:c.height}}
  var a=piccola(im,nw,nh),ang=SCAN.inclinazione(a.g,a.w,a.h),W=Math.round(nw*s),H=Math.round(nh*s),r=ang*Math.PI/180,
@@ -318,9 +334,43 @@ function scansiona(im){return new Promise(function(ok){try{
  x1.translate(CW/2,CH/2);x1.rotate(-r);x1.drawImage(im,-W/2,-H/2,W,H);
  var b=piccola(c1,CW,CH),bx=SCAN.ritaglio(b.g,b.w,b.h),k=CW/b.w,sx=Math.round(bx.x*k),sy=Math.round(bx.y*k),sw=Math.min(CW-sx,Math.round(bx.w*k)),sh=Math.min(CH-sy,Math.round(bx.h*k)),
   c2=document.createElement("canvas");c2.width=sw;c2.height=sh;var x2=c2.getContext("2d",{willReadFrequently:true});x2.drawImage(c1,sx,sy,sw,sh,0,0,sw,sh);
- var d=x2.getImageData(0,0,sw,sh),g=SCAN.normalizza(SCAN.grigio(d.data,sw,sh),sw,sh),i,j=0;for(i=0;i<d.data.length;i+=4){d.data[i]=d.data[i+1]=d.data[i+2]=g[j++]}x2.putImageData(d,0,0);
- var out=new Image();out.onload=function(){ok(out)};out.onerror=function(){ok(null)};out.src=c2.toDataURL("image/jpeg",.92)
+ finitura(x2.getImageData(0,0,sw,sh).data,sw,sh,null,B).then(function(r){if(r)r.bordi=false;ok(r)})
 }catch(e){ok(null)}})}
+/* ---------- le scansioni da guardare e copiare ---------- */
+function ruota(url,rot){return new Promise(function(ok){if(!rot)return ok(url);var im=new Image();im.onload=function(){var c=document.createElement("canvas"),r=rot%180!==0;c.width=r?im.height:im.width;c.height=r?im.width:im.height;var x=c.getContext("2d");x.translate(c.width/2,c.height/2);x.rotate(rot*Math.PI/180);x.drawImage(im,-im.width/2,-im.height/2);ok(c.toDataURL("image/jpeg",.9))};im.onerror=function(){ok(url)};im.src=url})}
+function mostraScansione(U,n){var S=U.scan;if(!S)return;var box=$("scans");box.hidden=false;$("scansHint").hidden=false;
+ var d=U.el||document.createElement("div");d.className="scan";U.el=d;U.modo=U.modo||"colore";
+ Promise.all([ruota(S.colore,U.rot||0),ruota(S.bn,U.rot||0)]).then(function(v){U.vista={colore:v[0],bn:v[1]};
+  d.innerHTML='<img alt="Documento '+n+' scansionato" src="'+U.vista[U.modo]+'"><small>Foto '+n+(S.bordi?" · bordi trovati e raddrizzata":" · bordi non trovati: sistemali tu se serve")+'</small><div class="row"><button class="btn g s" type="button" data-a="grande">🔍 Apri grande</button><button class="btn g s" type="button" data-a="modo">'+(U.modo==="colore"?"⬛ Bianco e nero":"🎨 Colori")+'</button><button class="btn g s" type="button" data-a="bordi">✂️ Sistema i bordi</button><button class="btn g s" type="button" data-a="salva">📤 Salva</button></div>';
+  d.querySelector("img").onclick=function(){grande(U.vista[U.modo])};
+  d.querySelectorAll("button").forEach(function(b){b.onclick=function(){var a=b.getAttribute("data-a");
+   if(a==="grande")grande(U.vista[U.modo]);if(a==="modo"){U.modo=U.modo==="colore"?"bn":"colore";mostraScansione(U,n)}
+   if(a==="bordi")editorBordi(U,n);if(a==="salva")salva(U.vista[U.modo],"documento-"+n+".jpg")}});
+  if(!d.parentNode)box.appendChild(d)})}
+function grande(url){var o=document.createElement("div");o.className="fs";o.innerHTML='<div class="fsbar"><span>Tieni premuto sul testo → <b>Seleziona tutto</b> → <b>Copia</b></span><button class="btn s" type="button">✕ Chiudi</button></div><img alt="Documento scansionato" src="'+url+'">';
+ o.querySelector("button").onclick=function(){o.remove()};document.body.appendChild(o)}
+function salva(url,nome){fetch(url).then(function(r){return r.blob()}).then(function(b){var f=new File([b],nome,{type:"image/jpeg"});
+ if(navigator.canShare&&navigator.canShare({files:[f]}))return navigator.share({files:[f]}).catch(function(){});
+ var a=document.createElement("a");a.href=url;a.download=nome;document.body.appendChild(a);a.click();a.remove()})}
+/* ✂️ come nelle app scanner: si trascinano i 4 angoli sopra la foto originale */
+function editorBordi(U,n){var S=U.scan;if(!S||!S.base)return;var B=S.base,o=document.createElement("div");o.className="fs";
+ o.innerHTML='<div class="fsbar"><span>Trascina i 4 pallini sugli angoli del documento</span></div><canvas></canvas><div class="row fsrow"><button class="btn" type="button" data-a="ok">✓ Applica</button><button class="btn g" type="button" data-a="tutta">Tutta la foto</button><button class="btn g" type="button" data-a="no">Annulla</button></div>';
+ document.body.appendChild(o);var cv=o.querySelector("canvas"),ctx=cv.getContext("2d"),bw=Math.min(window.innerWidth-16,560),k=bw/B.w,src=telaDa(B.px,B.w,B.h);
+ cv.width=Math.round(B.w*k);cv.height=Math.round(B.h*k);cv.style.width=cv.width+"px";cv.style.height=cv.height+"px";
+ var Q=(S.quad||[[B.w*.05,B.h*.05],[B.w*.95,B.h*.05],[B.w*.95,B.h*.95],[B.w*.05,B.h*.95]]).map(function(p){return[p[0]*k,p[1]*k]}),pres=-1;
+ function disegna(){ctx.drawImage(src,0,0,cv.width,cv.height);ctx.fillStyle="rgba(0,0,0,.35)";ctx.beginPath();ctx.rect(0,0,cv.width,cv.height);ctx.moveTo(Q[0][0],Q[0][1]);for(var i=3;i>=0;i--)ctx.lineTo(Q[i][0],Q[i][1]);ctx.fill("evenodd");
+  ctx.strokeStyle="#19c37d";ctx.lineWidth=3;ctx.beginPath();Q.forEach(function(p,i){i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1])});ctx.closePath();ctx.stroke();
+  Q.forEach(function(p){ctx.beginPath();ctx.arc(p[0],p[1],14,0,7);ctx.fillStyle="rgba(25,195,125,.45)";ctx.fill();ctx.lineWidth=3;ctx.stroke()})}
+ function pos(e){var r=cv.getBoundingClientRect();return[e.clientX-r.left,e.clientY-r.top]}
+ cv.style.touchAction="none";
+ cv.onpointerdown=function(e){var p=pos(e),m=1e9;Q.forEach(function(q,i){var d=Math.hypot(q[0]-p[0],q[1]-p[1]);if(d<m){m=d;pres=i}});if(m>60)pres=-1;else cv.setPointerCapture(e.pointerId)};
+ cv.onpointermove=function(e){if(pres<0)return;var p=pos(e);Q[pres]=[Math.max(0,Math.min(cv.width,p[0])),Math.max(0,Math.min(cv.height,p[1]))];disegna()};
+ cv.onpointerup=cv.onpointercancel=function(){pres=-1};disegna();
+ o.querySelectorAll("button").forEach(function(b){b.onclick=function(){var a=b.getAttribute("data-a");if(a==="no")return o.remove();
+  if(a==="tutta")Q=[[0,0],[cv.width,0],[cv.width,cv.height],[0,cv.height]];
+  var quad=Q.map(function(p){return[p[0]/k,p[1]/k]});o.remove();say($("mL"),"Raddrizzo…",true);
+  conBordi(B,quad).then(function(r){if(!r)return say($("mL"),"Non riesco a raddrizzarla: prova con altri angoli.");r.bordi=true;U.scan=r;U.sc=r.img;U.testi=[];U.carta=undefined;U.etich=0;U.rot=0;
+   mostraScansione(U,n);say($("mL"),"Bordi sistemati. Per rileggere i dati da questa scansione premi «↻ Riprova a leggere le foto».",true)})}})}
 function anteprima(im){var s=Math.min(1,900/Math.max(im.naturalWidth,im.naturalHeight)),c=document.createElement("canvas");c.width=Math.round(im.naturalWidth*s);c.height=Math.round(im.naturalHeight*s);c.getContext("2d").drawImage(im,0,0,c.width,c.height);return c.toDataURL("image/jpeg",.8)}
 function leggiMRZ(w,im,giri){giri=giri||[0,90,270,180];var i=0;
  function prova(){if(i>=giri.length)return Promise.resolve(null);var c=tela(im,giri[i++],2000);
@@ -363,15 +413,15 @@ function concordi(testi){var L=testi.map(function(t){return INC.leggi(t).persone
 function completo(testi){var p=INC.unisci(testi,{}).persone[0];if(!p)return false;var pat=p.tipo_documento==="PATEN";
  return!!(p.cognome&&p.nome&&p.data_nascita&&p.numero_documento&&(pat||p.sesso)&&(pat||p.cittadinanza)&&(p.comune_nascita||p.luogo_nascita||p.stato_nascita))}
 /* legge UNA foto in più modi; U = {im, sc, testi, rot}. forte = «Riprova»: più varianti e nessuna fermata anticipata */
-function leggiFoto(w,U,dici,forte){var base=U.sc||U.im,testi=U.testi=U.testi||[],passi=0,zona=null;
+function leggiFoto(w,U,dici,forte){var IM=U.scan&&U.scan.piatta||U.im,base=U.sc||IM,testi=U.testi=U.testi||[],passi=0,zona=null; /* documento raddrizzato (bordi trovati) al posto della foto storta */
  var aggiungi=function(t){if(t&&t.replace(/\s/g,"").length>8)testi.push(t)};
  var tappa=function(msg){passi++;dici(msg+" ("+passi+")")};
  var verso=U.rot!=null?Promise.resolve(U.rot):(function(){var giri=[0,90,270,180],i=0,best={n:-1,rot:0,t:"",tsv:""};
   function prova(){if(i>=giri.length)return best;var rot=giri[i++];tappa("cerco il verso giusto");
-   return ocr(w,tela(U.im,rot,2000),"11",true).then(function(r){var n=etichetteIn(r.t);if(n>best.n)best={n:n,rot:rot,t:r.t,tsv:r.tsv};return n>=4?best:prova()})}
+   return ocr(w,tela(IM,rot,2000),"11",true).then(function(r){var n=etichetteIn(r.t);if(n>best.n)best={n:n,rot:rot,t:r.t,tsv:r.tsv};return n>=4?best:prova()})}
   return Promise.resolve(prova()).then(function(b){U.rot=b.rot;U.etich=b.n;aggiungi(b.t);var H=0;String(b.tsv).split("\n").forEach(function(l){var c=l.split("\t");if(c.length>=12&&+c[0]===1)H=+c[9]});zona=H?zonaEtichette(b.tsv,H):null;return b.rot})})();
  return verso.then(function(rot){return cercaCarta(w,U,rot,tappa,aggiungi).then(function(cc){
-  var src=cc?cc:U.im,rr=cc?0:rot;if(cc)zona=null;
+  var src=cc?cc:IM,rr=cc?0:rot;if(cc)zona=null;
   var lista=[];
   fasceDi(src,rr,zona&&zona.da,zona&&zona.a).forEach(function(c){lista.push({c:c,modo:"blu",psm:"11",msg:"leggo a fasce ingrandite"})});
   lista.push({im:src,modo:"",psm:"6",msg:"rileggo la foto intera"});
@@ -388,8 +438,8 @@ function leggiFoto(w,U,dici,forte){var base=U.sc||U.im,testi=U.testi=U.testi||[]
 /* «dov'è la carta?»: se nella foto intera le etichette si leggono poco (carta piccola in una foto grande), la si cerca in 5 riquadri
    sovrapposti ingranditi e si tiene quello con più etichette; il resto della lettura si fa solo lì. */
 function cercaCarta(w,U,rot,tappa,aggiungi){if(U.etich>=4)return Promise.resolve(U.carta||null);if(U.carta!==undefined)return Promise.resolve(U.carta);
- var L=lato(U.im),r=rot%180!==0,W=r?L.h:L.w,H=r?L.w:L.h,s=Math.min(1,3000/Math.max(W,H)),b=document.createElement("canvas");b.width=Math.round(W*s);b.height=Math.round(H*s);
- var bx=b.getContext("2d");bx.translate(b.width/2,b.height/2);bx.rotate(rot*Math.PI/180);bx.drawImage(U.im,-Math.round(L.w*s)/2,-Math.round(L.h*s)/2,Math.round(L.w*s),Math.round(L.h*s));
+ var IM=U.scan&&U.scan.piatta||U.im,L=lato(IM),r=rot%180!==0,W=r?L.h:L.w,H=r?L.w:L.h,s=Math.min(1,3000/Math.max(W,H)),b=document.createElement("canvas");b.width=Math.round(W*s);b.height=Math.round(H*s);
+ var bx=b.getContext("2d");bx.translate(b.width/2,b.height/2);bx.rotate(rot*Math.PI/180);bx.drawImage(IM,-Math.round(L.w*s)/2,-Math.round(L.h*s)/2,Math.round(L.w*s),Math.round(L.h*s));
  var Q=[[0,0,.62,.62],[.38,0,1,.62],[0,.38,.62,1],[.38,.38,1,1],[.19,.19,.81,.81]],best={n:U.etich||0,q:null,t:""};
  var taglia=function(q,m){var x0=Math.max(0,q[0]-m),y0=Math.max(0,q[1]-m),x1=Math.min(1,q[2]+m),y1=Math.min(1,q[3]+m),c=document.createElement("canvas");c.width=Math.round((x1-x0)*b.width);c.height=Math.round((y1-y0)*b.height);c.getContext("2d").drawImage(b,x0*b.width,y0*b.height,c.width,c.height,0,0,c.width,c.height);return c};
  return Q.reduce(function(pr,q){return pr.then(function(){tappa("cerco dov'è il documento");return ocr(w,tela(taglia(q,0),0,2000),"11").then(function(x){var n=etichetteIn(x.t);if(n>best.n)best={n:n,q:q,t:x.t}})})},Promise.resolve())
@@ -398,7 +448,7 @@ function cercaCarta(w,U,rot,tappa,aggiungi){if(U.etich>=4)return Promise.resolve
 function personeDaFoto(){var P=[];ULTIME.forEach(function(U){var ps=INC.unisci(U.testi||[],{}).persone;
   if(!ps.length){var best=null;(U.testi||[]).forEach(function(t){var q=INC.leggi(t).persone[0];if(q){var n=Object.keys(q).filter(function(k){return q[k]&&typeof q[k]==="string"}).length;if(!best||n>best.n)best={n:n,q:q}}});if(best)ps=[best.q]}
   P=P.concat(ps)});
- return INC.raggruppa(P)}
+ return INC.raggruppa(P).map(INC.sessoDalNome)}
 function testoMigliore(U){var b="",s=-1;(U.testi||[]).forEach(function(t){var n=INC.riempiti(INC.leggi1(t,{largo:true}));if(n>s){s=n;b=t}});return b}
 var ULTIME=[],FILES=[],TUTTI=[];
 /* «Riprova»: stesse foto, molti più modi di leggerle (tutte le fasce, canali, scansione, testo sparso); poi il voto tra tutte le letture */
@@ -423,11 +473,11 @@ function daMRZ(r,foto){var g=nuovo({cognome:r.cognome,nome:r.nome,sesso:r.sesso,
  return g}
 $("foto").addEventListener("change",function(){var fs=[].slice.call(this.files||[]);this.value="";if(!fs.length)return;
  if(fs.length>6){say($("mL"),"Al massimo 6 foto per volta: leggo le prime 6.");fs=fs.slice(0,6)}
- $("drop").style.pointerEvents="none";TESTI=[];ULTIME=[];FILES=fs;var nuovi=[],senza=[],n=0,prima=!TESS;
+ $("drop").style.pointerEvents="none";TESTI=[];ULTIME=[];FILES=fs;$("scans").innerHTML="";$("scans").hidden=true;$("scansHint").hidden=true;var nuovi=[],senza=[],n=0,prima=!TESS;
  say($("mL"),prima?"Preparo il lettore (solo la prima volta, qualche secondo)…":"Leggo…",true);
  lettore().then(function(w){
   return fs.reduce(function(pr,f){return pr.then(function(){n++;say($("mL"),"Scansiono e leggo la foto "+n+" di "+fs.length+"…",true);
-   return immagine(f).then(function(x){return scansiona(x.im).then(function(sc){var u=anteprima(sc||x.im),U={sc:sc,im:x.im,testi:[]};ULTIME.push(U);var k=n;return leggiFoto(w,U,function(m){say($("mL"),"Foto "+k+" di "+fs.length+": "+m+"…",true)},false).then(function(r){TESTI.push(testoMigliore(U));URL.revokeObjectURL(x.u);
+   return immagine(f).then(function(x){return scansiona(x.im).then(function(S){var sc=S&&S.img,u=anteprima(sc||x.im),U={sc:sc,im:x.im,testi:[],scan:S};ULTIME.push(U);var k=n;mostraScansione(U,k);return leggiFoto(w,U,function(m){say($("mL"),"Foto "+k+" di "+fs.length+": "+m+"…",true)},false).then(function(r){TESTI.push(testoMigliore(U));URL.revokeObjectURL(x.u);if(U.rot)mostraScansione(U,k);
     if(r){var g=daMRZ(r,senza.concat([u]));senza=[];nuovi.push(g)}else senza.push(u)})})})})},Promise.resolve())})
  .then(function(){
   if(senza.length&&nuovi.length){nuovi[nuovi.length-1].foto=nuovi[nuovi.length-1].foto.concat(senza);senza=[]}
@@ -504,6 +554,7 @@ $("incVai").onclick=function(){var vai=function(t){if(!t||!t.trim()){$("inc").op
  if(navigator.clipboard&&navigator.clipboard.readText)navigator.clipboard.readText().then(vai,function(){vai("")});else vai("")};
 $("incRi").onclick=function(){leggiIncolla(false,true)};
 $("fotoRi").onclick=riprovaFoto;
+$("scansInc").onclick=function(){$("incVai").click()};
 $("fotoAi").onclick=function(){if(!FILES.length)return;if(!confirm("Leggo le foto con l'AI. Consuma token AI. Procedo?"))return;say($("mL"),"Leggo con l'AI…",true);leggiConAI(FILES)};
 $("incAi").onclick=function(){leggiIncolla(true)};
 $("incPul").onclick=function(){$("incT").value="";say($("mI"),"",true)};

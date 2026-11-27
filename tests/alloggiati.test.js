@@ -284,3 +284,27 @@ console.log(n + " prove superate");
   assert.equal(p.sesso, "F"); assert.ok(p.dubbi.indexOf("sesso") >= 0);
   console.log("ok  ragionatore: messaggi IT/EN/FR/DE, elenchi, date, più persone, perché e dubbi");
 })();
+
+// ---- SCANNER «come le app»: angoli di un documento fotografato di sbieco, raddrizzamento (immagine SINTETICA) ----
+(function () {
+  require("../admin/alloggiati/scanner.js"); const S = globalThis.SCAN;
+  const w = 900, h = 1200, rgba = new Uint8Array(w * h * 4), Q = [[140, 300], [780, 340], [820, 820], [110, 760]];
+  const dentro = (x, y) => { let s = 0; for (let i = 0; i < 4; i++) { const a = Q[i], b = Q[(i + 1) % 4], c = (b[0] - a[0]) * (y - a[1]) - (b[1] - a[1]) * (x - a[0]); if (c < 0) return false; } return true; };
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = (y * w + x) * 4, riga = (y + Math.round(x / 7)) % 23 < 5; // tavolo con le venature
+    let c = dentro(x, y) ? [232, 238, 245] : riga ? [125, 85, 50] : [150, 105, 65];
+    if (dentro(x, y) && y % 40 < 6 && x % 90 < 60 && x > 200 && x < 700) c = [40, 40, 50]; // «testo»
+    rgba[i] = c[0]; rgba[i + 1] = c[1]; rgba[i + 2] = c[2]; rgba[i + 3] = 255;
+  }
+  const r = S.angoli(S.grigio(rgba, w, h), w, h, rgba);
+  assert.ok(r, "trova il documento");
+  const err = Math.max(...Q.map((q, i) => Math.hypot(q[0] - r.punti[i][0], q[1] - r.punti[i][1])));
+  assert.ok(err < 12, "angoli precisi (errore " + err.toFixed(1) + " px)");
+  const m = S.misure(r.punti, 800), px = S.raddrizza(rgba, w, h, r.punti, m.w, m.h);
+  assert.ok(m.w > m.h && px.length === m.w * m.h * 4, "documento orizzontale raddrizzato");
+  const c0 = (Math.round(m.h / 2) * m.w + 10) * 4; assert.ok(px[c0] > 200, "dentro il raddrizzato c'è il documento, non il tavolo");
+  const mg = S.migliora(px, m.w, m.h); assert.ok(mg[c0] >= 240, "«Migliora» rende bianco il fondo");
+  // foto senza bordi (documento che riempie tutta la foto): non inventa angoli
+  const pieno = new Uint8Array(w * h * 4).fill(235); assert.equal(S.angoli(S.grigio(pieno, w, h), w, h, pieno), null);
+  console.log("ok  scanner: angoli di sbieco, raddrizza, migliora, niente angoli inventati");
+})();

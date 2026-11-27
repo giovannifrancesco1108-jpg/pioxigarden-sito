@@ -66,7 +66,7 @@ function ocr(dataUrl, psm, wl, tsv) {
     const t0 = Date.now(), n0 = nOcr;
     const inp = await pg.$("#foto"); await inp.uploadFile(files[i]);
     await pg.waitForFunction(() => window.__fatto === true, { polling: 500 });
-    const r1 = await pg.evaluate(() => ({ T: window.__T || [], P: window.__P || [], MRZ: window.__MRZ || [], msg: document.getElementById("mL").textContent, G: window.__G().map((g) => ({ cognome: g.cognome, nome: g.nome, sesso: g.sesso, nascita: g.nascita, citt: g.citt, statoN: g.statoN, comuneN: g.comuneN, num: g.num, ril: g.ril, doc: g.doc, dubbi: Object.keys(g.dubbi || {}) })) }));
+    const r1 = await pg.evaluate(() => ({ T: window.__T || [], P: window.__P || [], MRZ: window.__MRZ || [], msg: document.getElementById("mL").textContent, scans: [].map.call(document.querySelectorAll("#scans .scan small"), (x) => x.textContent), G: window.__G().map((g) => ({ cognome: g.cognome, nome: g.nome, sesso: g.sesso, nascita: g.nascita, citt: g.citt, statoN: g.statoN, comuneN: g.comuneN, num: g.num, ril: g.ril, doc: g.doc, dubbi: Object.keys(g.dubbi || {}) })) }));
     const voce = { file: path.basename(files[i]), primo: r1, ocr1: nOcr - n0, sec1: Math.round((Date.now() - t0) / 1000), errori };
     if (RIPROVA) {
       const t1 = Date.now(), n1 = nOcr;
