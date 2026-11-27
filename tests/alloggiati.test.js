@@ -313,5 +313,17 @@ console.log(n + " prove superate");
   assert.ok(q0.voto >= 80 && !q0.problemi.some((t) => /sfocat/.test(t)), "foto nitida: buona (" + q0.voto + ")");
   assert.ok(q1.voto < q0.voto && q1.problemi.some((t) => /sfocat/.test(t)), "foto sfocata segnalata (" + q1.voto + ")");
   assert.ok(q2.problemi.some((t) => /bordi/.test(t)), "bordi non trovati segnalati");
-  console.log("ok  scanner: angoli di sbieco, raddrizza, migliora, qualità della foto, niente angoli inventati");
+  // DUE documenti nella stessa foto → due quadrilateri; un documento solo → uno (la fototessera non è un documento)
+  const due = new Uint8Array(w * h * 4), QQ = [[[60, 150], [840, 170], [830, 560], [70, 540]], [[80, 640], [850, 650], [840, 1060], [60, 1040]]];
+  const dentroQ = (Q, x, y) => { for (let i = 0; i < 4; i++) { const a = Q[i], b = Q[(i + 1) % 4]; if ((b[0] - a[0]) * (y - a[1]) - (b[1] - a[1]) * (x - a[0]) < 0) return false; } return true; };
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = (y * w + x) * 4, riga = (y + Math.round(x / 7)) % 23 < 5, k = dentroQ(QQ[0], x, y) ? 0 : dentroQ(QQ[1], x, y) ? 1 : -1;
+    let c = k >= 0 ? [232, 238, 245] : riga ? [125, 85, 50] : [150, 105, 65];
+    if (k >= 0 && x > 120 && x < 300 && y % 500 > 230 && y % 500 < 440) c = [150, 150, 160]; // fototessera
+    if (k >= 0 && y % 40 < 6 && x % 90 < 60 && x > 350 && x < 760) c = [40, 40, 50];
+    due[i] = c[0]; due[i + 1] = c[1]; due[i + 2] = c[2]; due[i + 3] = 255; }
+  const D2 = S.documenti(S.grigio(due, w, h), w, h, due);
+  assert.equal(D2.length, 2, "due documenti nella stessa foto");
+  QQ.forEach((Q, k) => assert.ok(Math.max(...Q.map((q, i) => Math.hypot(q[0] - D2[k].punti[i][0], q[1] - D2[k].punti[i][1]))) < 15, "angoli del documento " + (k + 1)));
+  assert.equal(S.documenti(S.grigio(rgba, w, h), w, h, rgba).length, 1, "un documento solo resta uno");
+  console.log("ok  scanner: angoli di sbieco, raddrizza, migliora, qualità della foto, più documenti nella stessa foto, niente angoli inventati");
 })();

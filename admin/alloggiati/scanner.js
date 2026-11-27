@@ -99,10 +99,10 @@ function riduci(g, w, h, M) {
 function sfoca(g, w, h) { var o = new Uint8Array(w * h), x, y, s, n, dx, dy; for (y = 0; y < h; y++) for (x = 0; x < w; x++) { s = 0; n = 0; for (dy = -1; dy <= 1; dy++) for (dx = -1; dx <= 1; dx++) { var X = x + dx, Y = y + dy; if (X >= 0 && Y >= 0 && X < w && Y < h) { s += g[Y * w + X]; n++; } } o[y * w + x] = s / n; } return o; }
 function incrocio(a, b) { var c1 = Math.cos(a.t), s1 = Math.sin(a.t), c2 = Math.cos(b.t), s2 = Math.sin(b.t), d = c1 * s2 - s1 * c2; if (Math.abs(d) < 1e-6) return null; return [(a.r * s2 - b.r * s1) / d, (c1 * b.r - c2 * a.r) / d]; }
 function canale(rgba, w, h, c) { var o = new Uint8Array(w * h), i, j = 0; for (i = c; i < rgba.length; i += 4) o[j++] = rgba[i]; return o; }
-function angoli(g, w, h, rgba) {
+function angoli(g, w, h, rgba, multi) {
   // i bordi si cercano su più «canali»: grigio e, se ci sono i colori, rosso, verde, blu (una carta chiara su un tavolo chiaro si stacca per il colore)
   var CH = [g]; if (rgba && rgba.length === w * h * 4) CH.push(canale(rgba, w, h, 0), canale(rgba, w, h, 1), canale(rgba, w, h, 2));
-  var R, W, H, N, mag, dir, x, y, i, hist = new Uint32Array(1024), PIC = [];
+  var R, W, H, N, mag, dir, x, y, i, hist = new Uint32Array(1024), PIC = [], TUTTI = [];
   CH.forEach(function (ch, q) {
     var Rq = riduci(ch, w, h, 420); if (!q) { R = Rq; W = R.w; H = R.h; N = W * H; mag = new Float32Array(N); dir = new Float32Array(N); }
     var b = sfoca(sfoca(Rq.g, W, H), W, H); PIC.push(b);
@@ -167,20 +167,59 @@ function angoli(g, w, h, rgba) {
       var P = [incrocio(top, sx), incrocio(top, dx_), incrocio(bot, dx_), incrocio(bot, sx)];
       if (P.some(function (p) { return !p || p[0] < -W * 0.04 || p[1] < -H * 0.04 || p[0] > W * 1.04 || p[1] > H * 1.04; })) continue;
       var area = 0; for (var k = 0; k < 4; k++) { var p0 = P[k], p1 = P[(k + 1) % 4]; area += p0[0] * p1[1] - p1[0] * p0[1]; } area = area / 2 / (W * H);
-      if (area < 0.1) continue;
+      if (area < (multi ? 0.035 : 0.1)) continue;
       var conv = true; for (k = 0; k < 4 && conv; k++) { var a = P[k], bb = P[(k + 1) % 4], cc = P[(k + 2) % 4]; if ((bb[0] - a[0]) * (cc[1] - bb[1]) - (bb[1] - a[1]) * (cc[0] - bb[0]) <= 0) conv = false; }
       if (!conv) continue;
       var cov = [sul(P[0], P[1]), sul(P[1], P[2]), sul(P[2], P[3]), sul(P[3], P[0])], mn = Math.min.apply(null, cov), me = (cov[0] + cov[1] + cov[2] + cov[3]) / 4;
       if (me < 0.5 || mn < 0.3) continue;
       var sc = me * (mn + 0.3) * Math.sqrt(area);
-      if (!best || sc > best.sc) best = { sc: sc, P: P, cov: me, area: area };
+      var cand = { sc: sc, P: P, cov: me, mn: mn, area: area };
+      if (multi) TUTTI.push(cand);
+      if (area >= 0.1 && (!best || sc > best.sc)) best = cand;
     }
   }
-  if (!best) return null;
-  var s = 1 / R.k, P0 = best.P.map(function (p) { return [p[0] * s, p[1] * s]; });
-  var Pf = affina(CH, w, h, P0) || P0;
-  return { punti: Pf.map(function (p) { return [Math.max(0, Math.min(w - 1, p[0])), Math.max(0, Math.min(h - 1, p[1]))]; }), sicurezza: Math.round(best.cov * 100) / 100, area: Math.round(best.area * 100) / 100 };
+  var fuori = function (b) { var s = 1 / R.k, P0 = b.P.map(function (p) { return [p[0] * s, p[1] * s]; }), Pf = affina(CH, w, h, P0) || P0;
+    return { punti: Pf.map(function (p) { return [Math.max(0, Math.min(w - 1, p[0])), Math.max(0, Math.min(h - 1, p[1]))]; }), sicurezza: Math.round(b.cov * 100) / 100, area: Math.round(b.area * 100) / 100 }; };
+  if (!multi) return best ? fuori(best) : null;
+  return sceltaMulti(best, TUTTI).map(fuori);
 }
+/* Più documenti nella stessa foto (es. due carte d'identità, o fronte e retro affiancati).
+   1) se il quadrilatero migliore contiene DUE documenti ben chiusi che insieme lo riempiono, sono due documenti;
+   2) si aggiungono altri documenti staccati, di misura simile e con i bordi chiari. Mai più di 4. */
+function centroDi(P) { return [(P[0][0] + P[1][0] + P[2][0] + P[3][0]) / 4, (P[0][1] + P[1][1] + P[2][1] + P[3][1]) / 4]; }
+function dentroQ(p, P, m) { for (var i = 0; i < 4; i++) { var a = P[i], b = P[(i + 1) % 4], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; if (((b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0])) / l < -(m || 0)) return false; } return true; }
+function scatola(P) { var xs = P.map(function (p) { return p[0]; }), ys = P.map(function (p) { return p[1]; }); return [Math.min.apply(null, xs), Math.min.apply(null, ys), Math.max.apply(null, xs), Math.max.apply(null, ys)]; }
+function sovrapp(A, B) { var a = scatola(A), b = scatola(B), ix = Math.max(0, Math.min(a[2], b[2]) - Math.max(a[0], b[0])), iy = Math.max(0, Math.min(a[3], b[3]) - Math.max(a[1], b[1])); return ix * iy / Math.min((a[2] - a[0]) * (a[3] - a[1]), (b[2] - b[0]) * (b[3] - b[1])); }
+function sceltaMulti(best, T) {
+  var buoni = T.filter(function (c) { return c.cov >= 0.7 && c.mn >= 0.5; });
+  var docs = best ? [best] : [], i, j;
+  if (best) { // 1) il migliore è in realtà due documenti vicini?
+    var dent = buoni.filter(function (c) { return c !== best && c.area >= best.area * 0.2 && c.area <= best.area * 0.8 && c.P.every(function (p) { return dentroQ(p, best.P, 6); }); }), coppia = null;
+    for (i = 0; i < dent.length; i++) for (j = i + 1; j < dent.length; j++) {
+      var B = dent[i], C = dent[j]; if (sovrapp(B.P, C.P) > 0.12 || B.area + C.area < best.area * 0.7) continue;
+      // i due pezzi devono occupare insieme i 4 angoli del «grande» (2 a testa): così non si scambia la fototessera o un riquadro interno per un documento
+      var sb = scatola(best.P), tol = Math.hypot(sb[2] - sb[0], sb[3] - sb[1]) * 0.07, presi = [0, 0, 0, 0];
+      var angoliDi = function (X) { var n = 0; best.P.forEach(function (a, q) { if (X.P.some(function (p) { return Math.hypot(p[0] - a[0], p[1] - a[1]) < tol; })) { presi[q]++; n++; } }); return n; };
+      var nb = angoliDi(B), nc = angoliDi(C);
+      if (nb < 2 || nc < 2 || presi.some(function (x) { return x !== 1; })) continue;
+      if (B.cov < best.cov - 0.05 || C.cov < best.cov - 0.05) continue;
+      if (B.area / C.area > 2.5 || C.area / B.area > 2.5) continue;
+      if (!coppia || B.sc + C.sc > coppia.sc) coppia = { sc: B.sc + C.sc, d: [B, C] };
+    }
+    if (coppia) docs = coppia.d;
+  }
+  if (!docs.length) { buoni.sort(function (a, b) { return b.sc - a.sc; }); if (buoni[0]) docs = [buoni[0]]; }
+  // 2) altri documenti staccati
+  buoni.sort(function (a, b) { return b.sc - a.sc; });
+  for (i = 0; i < buoni.length && docs.length < 4; i++) {
+    var c = buoni[i]; if (docs.indexOf(c) >= 0) continue;
+    var rif = docs[0], ok = c.sc >= rif.sc * 0.45 && c.area >= rif.area / 3 && c.area <= rif.area * 3;
+    for (j = 0; j < docs.length && ok; j++) if (sovrapp(c.P, docs[j].P) > 0.1 || dentroQ(centroDi(c.P), docs[j].P) || dentroQ(centroDi(docs[j].P), c.P)) ok = false;
+    if (ok) docs.push(c);
+  }
+  return docs.sort(function (a, b) { var ca = centroDi(a.P), cb = centroDi(b.P); return Math.abs(ca[1] - cb[1]) > 40 ? ca[1] - cb[1] : ca[0] - cb[0]; });
+}
+function documenti(g, w, h, rgba) { return angoli(g, w, h, rgba, true); }
 /* precisione: ogni lato viene rimesso sul bordo vero guardando la foto più grande (salto di colore più forte lungo la perpendicolare) */
 function affina(CH, w, h, P) {
   var RR = CH.map(function (c) { return riduci(c, w, h, 1100); }), k = RR[0].k, W = RR[0].w, H = RR[0].h, IM = RR.map(function (r) { return sfoca(r.g, W, H); });
@@ -273,6 +312,6 @@ function qualita(g, w, h, ang) {
   return { voto: Math.max(0, voto), nitidezza: Math.round(nit), luce: Math.round(luce), riflessi: Math.round(rifl * 1000) / 10, problemi: P };
 }
 
-root.SCAN = { qualita: qualita, grigio: grigio, ritaglio: ritaglio, inclinazione: inclinazione, normalizza: normalizza, angoli: angoli, omografia: omografia, misure: misure, raddrizza: raddrizza, migliora: migliora };
+root.SCAN = { qualita: qualita, documenti: documenti, grigio: grigio, ritaglio: ritaglio, inclinazione: inclinazione, normalizza: normalizza, angoli: angoli, omografia: omografia, misure: misure, raddrizza: raddrizza, migliora: migliora };
 if (typeof module !== "undefined" && module.exports) module.exports = root.SCAN;
 })(typeof window !== "undefined" ? window : globalThis);
